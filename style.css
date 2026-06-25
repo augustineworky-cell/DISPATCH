@@ -1,0 +1,1474 @@
+/* ============================================
+   MakeMyClick Dispatch — style.css
+   ============================================ */
+
+/* ============================================
+   🎨 DESIGN TOKENS
+   ============================================ */
+:root {
+  /* ── Brand ──────────────────────────────── */
+  --brand-primary:        #4f46e5;
+  --brand-primary-hover:  #4338ca;
+  --brand-primary-active: #3730a3;
+  --brand-accent:         #7c3aed;
+  --brand-accent-hover:   #6d28d9;
+
+  /* ── Semantic ───────────────────────────── */
+  --color-success:        #10b981;
+  --color-success-light:  #d1fae5;
+  --color-success-dark:   #065f46;
+  --color-warning:        #f59e0b;
+  --color-warning-light:  #fef3c7;
+  --color-warning-dark:   #92400e;
+  --color-danger:         #ef4444;
+  --color-danger-light:   #fee2e2;
+  --color-danger-dark:    #991b1b;
+  --color-info:           #3b82f6;
+  --color-info-light:     #dbeafe;
+  --color-info-dark:      #1e3a8a;
+
+  /* ── Surface ────────────────────────────── */
+  --surface-base:         #f9fafb;
+  --surface-raised:       #ffffff;
+  --surface-overlay:      rgba(15, 23, 42, 0.50);
+  --surface-overlay-blur: rgba(15, 23, 42, 0.45);
+
+  /* ── Text ───────────────────────────────── */
+  --text-primary:         #111827;
+  --text-secondary:       #4b5563;
+  --text-muted:           #9ca3af;
+  --text-disabled:        #d1d5db;
+  --text-inverse:         #ffffff;
+
+  /* ── Border ─────────────────────────────── */
+  --border-subtle:        #f1f5f9;
+  --border-default:       #e5e7eb;
+  --border-strong:        #d1d5db;
+
+  /* ── Spacing (4px base) ─────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-12:  48px;
+  --space-16:  64px;
+
+  /* ── Radius ─────────────────────────────── */
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  20px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ────────────────────────────── */
+  --shadow-xs:    0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm:    0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:    0 8px 24px -4px rgba(0,0,0,0.10), 0 2px 8px -2px rgba(0,0,0,0.06);
+  --shadow-lg:    -10px 0 40px -5px rgba(0,0,0,0.15);
+  --shadow-xl:    0 24px 48px -12px rgba(0,0,0,0.20);
+  --shadow-brand: 0 4px 18px rgba(79,70,229,0.45);
+
+  /* ── Timing ─────────────────────────────── */
+  --duration-instant: 75ms;
+  --duration-fast:    150ms;
+  --duration-base:    250ms;
+  --duration-slow:    400ms;
+
+  /* ── Easing ─────────────────────────────── */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:      cubic-bezier(0.4, 0, 1, 1);
+
+  /* ── Z-Index Scale ──────────────────────── */
+  --z-base:     1;
+  --z-sticky:   10;
+  --z-dropdown: 50;
+  --z-overlay:  99;
+  --z-drawer:   10000;
+  --z-modal:    99999;
+  --z-toast:    999999;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.font-mono { 
+    font-family: 'JetBrains Mono', monospace; 
+}
+
+/* =========================================
+   Scrollbar
+   ========================================= */
+::-webkit-scrollbar { 
+    width: 6px; 
+    height: 6px; 
+}
+
+::-webkit-scrollbar-track { 
+    background: transparent; 
+}
+
+::-webkit-scrollbar-thumb { 
+    background: #cbd5e1; 
+    border-radius: 4px; 
+}
+
+::-webkit-scrollbar-thumb:hover { 
+    background: #94a3b8; 
+}
+
+/* =========================================
+   Sidebar Gradient & Navigation
+   ========================================= */
+.sidebar-gradient {
+    background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
+}
+
+.nav-item {
+    transition: all var(--duration-fast) var(--ease-default);
+}
+
+.nav-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.nav-item.active {
+    background: rgba(255,255,255,0.10);
+    box-shadow: inset 3px 0 0 #f97316;
+}
+
+/* =========================================
+   Cards & KPIs
+   ========================================= */
+.card-hover {
+    transition: transform var(--duration-base) var(--ease-default),
+                box-shadow var(--duration-base) var(--ease-default),
+                border-color var(--duration-base) var(--ease-default);
+}
+
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
+    border-color: var(--border-strong);
+}
+
+.kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =========================================
+   Kanban Board
+   ========================================= */
+.kanban-card {
+    transition: transform var(--duration-base) var(--ease-default),
+                box-shadow var(--duration-base) var(--ease-default),
+                border-color var(--duration-base) var(--ease-default);
+    cursor: pointer;
+}
+
+.kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    border-color: #818cf8;
+}
+
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: #eef2ff;
+    border: 2px dashed var(--brand-primary);
+    border-radius: var(--radius-md);
+}
+
+.sortable-drag {
+    cursor: grabbing !important;
+    transform: rotate(2deg);
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+/* =========================================
+   Modal
+   ========================================= */
+.hide { 
+    display: none !important; 
+}
+
+.modal-backdrop {
+    background-color: var(--surface-overlay);
+    backdrop-filter: blur(4px);
+}
+
+/* =========================================
+   🎯 SIDE DRAWER (NEW!)
+   ========================================= */
+.drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: var(--surface-overlay-blur);
+    backdrop-filter: blur(2px);
+    z-index: var(--z-overlay);
+    opacity: 0;
+    transition: opacity var(--duration-base) var(--ease-default);
+    pointer-events: none;
+}
+
+.drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.drawer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.drawer-panel.open {
+    transform: translateX(0);
+}
+
+.drawer-header {
+    flex-shrink: 0;
+    background: white;
+    z-index: 2;
+}
+
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* On mobile drawer takes full width */
+@media (max-width: 640px) {
+    .drawer-panel { 
+        max-width: 100%; 
+    }
+}
+
+/* =========================================
+   Toast Notifications
+   ========================================= */
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast-enter {
+    animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* =========================================
+   Spinner
+   ========================================= */
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-default);
+    border-top-color: var(--brand-primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { 
+    to { transform: rotate(360deg); } 
+}
+
+/* =========================================
+   Animations
+   ========================================= */
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in { 
+    animation: slideIn 0.4s ease; 
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.pulse { 
+    animation: pulse-dot 1.5s infinite; 
+}
+
+/* =========================================
+   Typography & UI Elements
+   ========================================= */
+/* Devanagari support */
+:lang(hi), .lang-hi {
+    font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', sans-serif;
+}
+
+/* Pill */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+/* ==========================================
+   📱 MOBILE VIEW
+   ========================================== */
+
+body.mobile-view aside,
+body.mobile-view header.h-16 {
+    display: none !important;
+}
+
+body.mobile-view #app {
+    display: block !important;
+}
+
+body.mobile-view #main-content {
+    padding: 0 !important;
+}
+
+body.mobile-view {
+    background: #f9fafb;
+}
+
+/* ==========================================
+   📱 MOBILE RESPONSIVE — GLOBAL FIXES
+   ========================================== */
+
+/* Better text scaling on mobile */
+html {
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Mobile view (< 768px) */
+@media (max-width: 767px) {
+    body {
+        font-size: 15px;
+    }
+
+    body.mobile-view {
+        font-size: 15px;
+        background: #f9fafb;
+    }
+
+    /* Make mobile cards bigger & more readable */
+    body.mobile-view #main-content {
+        padding: 0 !important;
+        font-size: 15px;
+    }
+
+    /* Larger touch targets — 48dp (Phase 3.1) */
+    body.mobile-view button,
+    body.mobile-view a,
+    body.mobile-view .kanban-card,
+    body.mobile-view [onclick] {
+        min-height: 48px;
+        -webkit-tap-highlight-color: rgba(79, 70, 229, 0.08);
+    }
+
+    /* Bigger text in mobile cards */
+    body.mobile-view h1 { font-size: 18px !important; }
+    body.mobile-view h2 { font-size: 17px !important; }
+    body.mobile-view h3 { font-size: 16px !important; }
+    body.mobile-view .text-sm { font-size: 14px !important; }
+    body.mobile-view .text-xs { font-size: 12px !important; }
+    body.mobile-view .text-\[10px\] { font-size: 11px !important; }
+    body.mobile-view .text-\[11px\] { font-size: 12px !important; }
+
+    /* Drawer takes full screen on mobile */
+    .drawer-panel {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .drawer-body {
+        padding-bottom: 80px; /* space for actions */
+    }
+
+    /* Modals fit better */
+    .modal-backdrop > div,
+    [id$="-modal"] > div {
+        max-width: 95vw !important;
+        margin: 0 8px;
+        max-height: 90vh !important;
+    }
+
+    /* Form inputs bigger on mobile */
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"],
+    input[type="file"],
+    select,
+    textarea {
+        font-size: 16px !important; /* prevents iOS zoom */
+        min-height: 44px;
+        padding: 10px 12px;
+    }
+
+    /* Buttons in modals/forms */
+    button[type="submit"],
+    button.bg-indigo-600,
+    button.bg-emerald-600,
+    button.bg-red-600 {
+        min-height: 44px;
+        font-size: 14px;
+    }
+
+    /* File input full width */
+    input[type="file"] {
+        width: 100%;
+    }
+
+    /* Hide non-essential desktop elements on mobile */
+    body.mobile-view .hidden-mobile {
+        display: none !important;
+    }
+
+    /* Better scrolling */
+    .drawer-body,
+    .overflow-y-auto {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Loading spinner sized for mobile */
+    .spinner {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    aside.w-64 {
+        width: 220px;
+    }
+
+    main {
+        padding: 16px !important;
+    }
+}
+
+/* iPhone notch / safe area */
+@supports (padding: max(0px)) {
+    body.mobile-view header {
+        padding-top: max(12px, env(safe-area-inset-top));
+    }
+
+    body.mobile-view {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+/* ==========================================
+   📱 CRITICAL MOBILE FIXES — must override desktop layout
+   ========================================== */
+
+body.mobile-view {
+    height: auto !important;
+    overflow: auto !important;
+    overflow-x: hidden !important;
+    display: block !important;
+}
+
+body.mobile-view #app {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+body.mobile-view #app > div {
+    display: block !important;
+    width: 100% !important;
+    overflow: visible !important;
+}
+
+body.mobile-view main,
+body.mobile-view #main-content {
+    display: block !important;
+    overflow: visible !important;
+    flex: none !important;
+    padding: 0 !important;
+    background: #f9fafb;
+    min-height: 100vh;
+}
+
+/* Mobile drawer fully covers everything */
+body.mobile-view .drawer-panel {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+body.mobile-view .drawer-overlay,
+body.mobile-view .drawer-panel {
+    z-index: 200 !important;
+}
+/* ==========================================
+   📱 DRAWER FIX — works at any screen size
+   ========================================== */
+body.mobile-view .drawer-overlay {
+    z-index: 999 !important;
+}
+
+body.mobile-view .drawer-panel {
+    z-index: 1000 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+#drawer-root-body {
+    position: relative;
+    z-index: 999;
+}
+/* ==========================================
+   🚨 DRAWER NUCLEAR FIX — beats all overrides
+   ========================================== */
+
+#drawer-root-body {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+#drawer-root-body .drawer-overlay,
+#drawer-root-body .drawer-panel {
+    pointer-events: auto;
+}
+
+#drawer-root-body .drawer-panel {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    height: 100vh !important;
+    width: 100% !important;
+    max-width: 480px !important;
+    background: var(--surface-raised) !important;
+    z-index: var(--z-drawer) !important;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+#drawer-root-body .drawer-panel.open {
+    transform: translateX(0) !important;
+}
+
+#drawer-root-body .drawer-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background-color: var(--surface-overlay-blur) !important;
+    backdrop-filter: blur(2px);
+    z-index: 9999 !important;
+    opacity: 0;
+    transition: opacity var(--duration-base) var(--ease-default);
+    pointer-events: none;
+}
+
+#drawer-root-body .drawer-overlay.open {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Mobile full-width */
+@media (max-width: 767px) {
+    #drawer-root-body .drawer-panel {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+/* ==========================================
+   🚨 MODAL ABOVE DRAWER — submit forms etc
+   ========================================== */
+
+/* All modals must be ABOVE drawer (z-index 10000) */
+.modal-backdrop,
+[id$="-modal"],
+#step-form-modal,
+#edit-pending-modal,
+#cancel-order-modal,
+#confirm-modal {
+    z-index: 99999 !important;
+}
+
+/* Modal backdrop fills screen above drawer */
+.modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+}
+/* Pulse animation for new order cards */
+@keyframes pulse-slow {
+    0%, 100% { box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2); }
+    50% { box-shadow: 0 8px 25px -3px rgba(239, 68, 68, 0.5); }
+}
+
+.animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+}
+/* ==========================================
+   🎤 VOICE NOTES
+   ========================================== */
+
+.voice-btn {
+    cursor: pointer;
+    border: none;
+    outline: none;
+}
+
+.voice-btn.voice-recording {
+    background: #dc2626 !important;
+    color: white !important;
+    animation: voice-pulse 1.2s infinite;
+}
+
+@keyframes voice-pulse {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 0 12px rgba(220, 38, 38, 0);
+        transform: scale(1.05);
+    }
+}
+/* ==========================================
+   🔄 PULL-TO-REFRESH
+   ========================================== */
+
+#pull-refresh-indicator {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    background: var(--surface-raised);
+    padding: 12px 20px;
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 9999;
+    opacity: 0;
+    transition: transform var(--duration-fast) var(--ease-default),
+                opacity var(--duration-fast) var(--ease-default);
+    pointer-events: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--brand-primary);
+}
+
+#pull-refresh-indicator.ready {
+    background: var(--brand-primary);
+    color: white;
+}
+
+#pull-refresh-indicator.refreshing .ptr-spinner i {
+    animation: ptr-spin 0.8s linear infinite;
+}
+
+@keyframes ptr-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+/* ==========================================
+   AUTO-REFRESH INDICATOR
+   ========================================== */
+
+#auto-refresh-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface-raised);
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-sm);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform var(--duration-fast) var(--ease-default),
+                box-shadow var(--duration-fast) var(--ease-default);
+    user-select: none;
+}
+
+#auto-refresh-indicator:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+#auto-refresh-indicator .ar-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--color-success);
+    border-radius: 50%;
+    animation: ar-pulse 2s infinite;
+    flex-shrink: 0;
+}
+
+@keyframes ar-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Hide on mobile — pull-to-refresh handles it */
+body.mobile-view #auto-refresh-indicator {
+    display: none !important;
+}
+
+@media (max-width: 400px) {
+    #auto-refresh-indicator {
+        font-size: 10px;
+        padding: 6px 10px;
+        bottom: 10px;
+        right: 10px;
+    }
+}
+
+/* ==========================================
+   🎯 UX POLISH — PHASE 1: BUTTON FEEDBACK
+   ========================================== */
+
+/* Universal press-scale on every enabled button */
+button:not(:disabled) {
+    position: relative;
+    overflow: hidden;
+    transition: transform var(--duration-fast) var(--ease-spring),
+                box-shadow       var(--duration-fast) var(--ease-default),
+                background-color var(--duration-fast) var(--ease-default),
+                border-color     var(--duration-fast) var(--ease-default),
+                opacity          var(--duration-fast) var(--ease-default);
+    transform-origin: center;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+button:not(:disabled):active {
+    transform: scale(0.96) !important;
+}
+
+/* Ripple wave — JS drops a <span class="ripple-wave"> at click coords */
+@keyframes ripple-out {
+    from { transform: scale(0); opacity: 0.22; }
+    to   { transform: scale(5); opacity: 0;    }
+}
+
+.ripple-wave {
+    position: absolute;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    margin-top: -14px;
+    pointer-events: none;
+    background: currentColor; /* white on dark btns, dark on light btns */
+    animation: ripple-out 560ms ease-out forwards;
+}
+
+/* ==========================================
+   Phase 1.2: Filter Chip Hover Lift
+   ========================================== */
+
+button[onclick*="setOrderFilter"]:not(:disabled),
+button[onclick*="setDatePreset"]:not(:disabled) {
+    transition: transform var(--duration-fast) var(--ease-default),
+                box-shadow var(--duration-fast) var(--ease-default),
+                background-color var(--duration-fast) var(--ease-default),
+                border-color var(--duration-fast) var(--ease-default),
+                color var(--duration-fast) var(--ease-default) !important;
+}
+
+button[onclick*="setOrderFilter"]:hover:not(:disabled),
+button[onclick*="setDatePreset"]:hover:not(:disabled) {
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+button[onclick*="setOrderFilter"]:active:not(:disabled),
+button[onclick*="setDatePreset"]:active:not(:disabled) {
+    transform: scale(0.93) !important;
+    box-shadow: none !important;
+}
+
+/* ==========================================
+   Phase 1.4: Sidebar Nav Polish
+   ========================================== */
+
+.sidebar-gradient nav a {
+    transition: background-color var(--duration-fast) var(--ease-default),
+                color var(--duration-fast) var(--ease-default),
+                transform var(--duration-instant) var(--ease-default) !important;
+}
+
+.sidebar-gradient nav a:active {
+    transform: scale(0.97) !important;
+}
+
+/* ==========================================
+   Phase 1.3: Order Row Click Animation
+   ========================================== */
+
+#orders-tbody tr {
+    transition: background-color 120ms ease;
+}
+
+#orders-tbody tr:hover td:first-child {
+    color: #4338ca;
+}
+
+#orders-tbody tr:active {
+    background-color: #e0e7ff !important;
+}
+
+/* Staggered slide-in for rows when list loads */
+@keyframes row-slide-in {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0);    }
+}
+
+.order-row-enter {
+    animation: row-slide-in 260ms ease both;
+}
+
+/* ==========================================
+   Phase 2.2: Drawer Content Stagger
+   ========================================== */
+
+@keyframes drawer-section-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* Each direct child of the drawer body staggers in */
+.drawer-body > * {
+    animation: drawer-section-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.drawer-body > *:nth-child(1)   { animation-delay:  40ms; }
+.drawer-body > *:nth-child(2)   { animation-delay:  85ms; }
+.drawer-body > *:nth-child(3)   { animation-delay: 125ms; }
+.drawer-body > *:nth-child(4)   { animation-delay: 160ms; }
+.drawer-body > *:nth-child(n+5) { animation-delay: 190ms; }
+
+/* ==========================================
+   Phase 2.1: Page Content Transition
+   Fires automatically — #main-content is a fresh element on every route change.
+   ========================================== */
+
+@keyframes page-content-in {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: translateY(0);   }
+}
+
+#main-content {
+    animation: page-content-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ==========================================
+   Phase 2.3: Modal Scale-In
+   ========================================== */
+
+@keyframes modal-pop-in {
+    from { opacity: 0; transform: scale(0.92) translateY(10px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+.modal-backdrop > div,
+[id$="-modal"] > div {
+    animation: modal-pop-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ==========================================
+   Phase 6.1: Skeleton Shimmer
+   ========================================== */
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
+}
+
+.skeleton-line {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 600px 100%;
+    animation: skeleton-shimmer 1.6s infinite linear;
+    border-radius: var(--radius-sm);
+    display: block;
+}
+
+/* ==========================================
+   Phase 6.3: Toast Progress Bar & Exit
+   ========================================== */
+
+@keyframes toast-drain {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 0 0 8px 8px;
+    transform-origin: left;
+    animation: toast-drain 3.5s linear forwards;
+}
+
+/* Toast container items need relative + overflow for progress bar */
+#toast-container > div {
+    position: relative !important;
+    overflow: hidden;
+}
+
+@keyframes toast-slide-out {
+    to { transform: translateX(115%); opacity: 0; }
+}
+
+.toast-exit {
+    animation: toast-slide-out 280ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+/* ==========================================
+   Phase 4.1: Input Focus Polish
+   ========================================== */
+
+input, select, textarea {
+    transition: border-color var(--duration-fast) var(--ease-default),
+                box-shadow var(--duration-fast) var(--ease-default),
+                background-color var(--duration-fast) var(--ease-default);
+}
+
+@keyframes input-shake {
+    0%, 100% { transform: translateX(0);    }
+    20%      { transform: translateX(-5px); }
+    40%      { transform: translateX( 5px); }
+    60%      { transform: translateX(-3px); }
+    80%      { transform: translateX( 3px); }
+}
+
+.input-error {
+    animation: input-shake 380ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+    border-color: var(--color-danger) !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18) !important;
+}
+
+/* ==========================================
+   Phase 5.1: Kanban Card Hover Glow
+   ========================================== */
+
+.kanban-card {
+    transition: transform var(--duration-base) var(--ease-spring),
+                box-shadow var(--duration-base) var(--ease-default),
+                border-color var(--duration-base) var(--ease-default) !important;
+}
+
+.kanban-card:hover {
+    transform: translateY(-3px) scale(1.01) !important;
+    box-shadow: 0 12px 24px -4px rgba(99, 102, 241, 0.2) !important;
+    border-color: var(--brand-primary) !important;
+}
+
+/* ==========================================
+   Phase 8.2: Status Indicator Dots
+   ========================================== */
+
+@keyframes dot-new-pulse {
+    0%, 100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.6); }
+    60%      { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);   }
+}
+
+.status-dot-new {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-danger);
+    display: inline-block; flex-shrink: 0;
+    animation: dot-new-pulse 1.8s ease-out infinite;
+}
+
+@keyframes dot-active-glow {
+    0%, 100% { box-shadow: 0 0 0 0   rgba(16, 185, 129, 0.5); }
+    60%      { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0);   }
+}
+
+.status-dot-active {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-success);
+    display: inline-block; flex-shrink: 0;
+    animation: dot-active-glow 2.5s ease-out infinite;
+}
+
+@keyframes dot-delayed-blink {
+    0%, 100% { opacity: 1;    }
+    50%      { opacity: 0.2;  }
+}
+
+.status-dot-delayed {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-warning);
+    display: inline-block; flex-shrink: 0;
+    animation: dot-delayed-blink 900ms ease-in-out infinite;
+}
+
+/* ==========================================
+   Phase 6.2: Empty State
+   ========================================== */
+
+.empty-state {
+    animation: page-content-in 400ms ease both;
+}
+
+/* ==========================================
+   Phase 3.2: New-Order Row Flash
+   Triggered by JS — add class .order-new-flash to highlight new arrivals
+   ========================================== */
+
+@keyframes new-row-flash {
+    0%   { background-color: rgba(16, 185, 129, 0.15); }
+    100% { background-color: transparent; }
+}
+
+.order-new-flash {
+    animation: new-row-flash 2.2s ease-out forwards;
+}
+
+/* ==========================================
+   Login Page
+   ========================================== */
+
+#login_btn {
+    transition: filter var(--duration-fast) var(--ease-default),
+                transform var(--duration-fast) var(--ease-spring),
+                box-shadow var(--duration-fast) var(--ease-default) !important;
+}
+
+#login_btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 28px rgba(79, 70, 229, 0.5) !important;
+}
+
+#login_btn:active:not(:disabled) {
+    transform: scale(0.97) !important;
+    filter: brightness(0.95);
+}
+
+#login_btn:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+}
+
+/* ==========================================
+   Global Hover Effects & Smooth Transitions
+   ========================================== */
+
+/* Links */
+a {
+  transition: color var(--duration-fast) var(--ease-default),
+              opacity var(--duration-fast) var(--ease-default);
+}
+
+/* Input / select / textarea focus glow */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
+  background-color: #fafbff !important;
+}
+
+select:hover:not(:focus) {
+  border-color: var(--border-strong);
+  cursor: pointer;
+}
+
+/* Table row full hover highlight */
+#orders-tbody tr:hover {
+  background-color: #f5f3ff !important;
+  box-shadow: inset 3px 0 0 var(--brand-primary);
+}
+
+/* Pill hover */
+.pill {
+  transition: transform var(--duration-fast) var(--ease-spring),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.pill:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-xs);
+}
+
+/* KPI icon micro-bounce on card hover */
+.kpi-icon {
+  transition: transform var(--duration-fast) var(--ease-spring),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.card-hover:hover .kpi-icon {
+  transform: scale(1.12) rotate(-4deg);
+}
+
+/* Drawer header icon buttons */
+.drawer-header button {
+  transition: background-color var(--duration-fast) var(--ease-default),
+              transform var(--duration-fast) var(--ease-spring) !important;
+}
+
+.drawer-header button:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+  transform: scale(1.1) !important;
+}
+
+/* Mobile order card hover on desktop */
+@media (hover: hover) {
+  .mob-order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.10);
+    border-color: var(--border-strong);
+  }
+
+  .mob-nav-tab:hover {
+    color: var(--brand-primary) !important;
+    background: rgba(79, 70, 229, 0.05);
+    border-radius: 12px;
+  }
+
+  .mob-nav-center:hover .mob-nav-plus {
+    transform: scale(1.08) rotate(45deg);
+  }
+}
+
+/* Interactive cursor for onclick/role elements missing it */
+[role="button"],
+[onclick],
+label[for] {
+  cursor: pointer;
+}
+
+/* Smooth scroll globally */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ==========================================
+   Phase 10: Reduced Motion — respect user preference
+   ========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration:       0.01ms !important;
+        animation-iteration-count: 1     !important;
+        transition-duration:      0.01ms !important;
+    }
+
+    .status-dot-new,
+    .status-dot-active,
+    .status-dot-delayed,
+    .toast-progress {
+        animation: none !important;
+    }
+}
+
+/* ==============================================
+   📱 NATIVE MOBILE ROUND 1
+   Phase 1.1 · 2.5 · 3.1 · 4.1 · 4.4
+   ============================================== */
+
+/* ── Phase 1.1: Bottom Navigation Bar ──────── */
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid rgba(229, 231, 235, 0.8);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.07);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+body.mobile-view .mobile-bottom-nav {
+    display: flex;
+}
+
+.mob-nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 4px 8px;
+    min-height: 56px !important;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s ease;
+    position: relative;
+    -webkit-user-select: none;
+    user-select: none;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.mob-nav-tab svg {
+    width: 22px;
+    height: 22px;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mob-nav-tab.active {
+    color: var(--brand-primary);
+}
+
+.mob-nav-tab.active svg {
+    transform: translateY(-1px) scale(1.12);
+}
+
+.mob-nav-tab:active svg {
+    transform: scale(0.85) !important;
+}
+
+/* Red badge count */
+.mob-nav-badge {
+    position: absolute;
+    top: 7px;
+    left: calc(50% + 5px);
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 17px;
+    text-align: center;
+    border: 2px solid white;
+    pointer-events: none;
+    box-sizing: content-box;
+}
+
+/* Center raised + button */
+.mob-nav-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 56px !important;
+}
+
+.mob-nav-plus {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-brand), 0 0 0 4px white;
+    margin-top: -14px;
+    transition: transform var(--duration-fast) var(--ease-spring),
+                box-shadow var(--duration-fast) var(--ease-default);
+    color: var(--text-inverse);
+}
+
+.mob-nav-plus svg {
+    width: 24px;
+    height: 24px;
+}
+
+.mob-nav-center:active .mob-nav-plus {
+    transform: scale(0.87);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35), 0 0 0 4px white;
+}
+
+.mob-nav-center-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #4f46e5;
+    margin-top: 5px;
+    letter-spacing: 0.02em;
+}
+
+/* ── Phase 2.5: Bottom Sheet Drawer ─────────── */
+@media (max-width: 767px) {
+    #drawer-root-body .drawer-panel {
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 93vh !important;
+        border-radius: 20px 20px 0 0 !important;
+        transform: translateY(110%) !important;
+        box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.18) !important;
+    }
+
+    #drawer-root-body .drawer-panel.open {
+        transform: translateY(0) !important;
+    }
+
+    /* Drag handle above drawer header */
+    #order-drawer::before {
+        content: '';
+        display: block;
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(0, 0, 0, 0.14);
+        margin: 12px auto 0;
+        flex-shrink: 0;
+    }
+
+    /* Drawer body clears bottom nav */
+    #drawer-root-body .drawer-body {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+
+/* ── Phase 4.1: Enhanced Mobile Order Cards ── */
+.mob-order-card {
+    background: var(--surface-raised);
+    border-radius: var(--radius-xl);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+    border: 1.5px solid var(--border-default);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
+    transition: transform var(--duration-fast) var(--ease-spring),
+                box-shadow var(--duration-fast) var(--ease-default);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.mob-order-card:active {
+    transform: scale(0.975);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.07);
+}
+
+.mob-order-card.is-delayed {
+    border-color: #fca5a5; /* light-red — intentionally not tokenized, specific to delayed state */
+}
+
+.mob-order-card.is-delayed::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #ef4444, #f97316);
+    border-radius: 16px 16px 0 0;
+}
+
+/* Stage progress dots */
+.stage-dots {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.stage-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-default);
+    flex-shrink: 0;
+    transition: background var(--duration-fast) var(--ease-default);
+}
+
+.stage-dot.done {
+    background: var(--color-success);
+}
+
+.stage-dot.current {
+    width: 8px;
+    height: 8px;
+    background: var(--brand-primary);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.22);
+}
+
+/* Open chevron circle */
+.mob-card-open-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #eef2ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.mob-order-card:active .mob-card-open-btn {
+    background: #c7d2fe;
+    transform: scale(0.88);
+}
+
+/* ── Phase 4.4: More Sheet ───────────────────── */
+#mobile-more-sheet > div:last-child {
+    animation: sheet-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes sheet-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}

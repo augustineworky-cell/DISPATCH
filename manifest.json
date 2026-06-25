@@ -1,0 +1,32 @@
+{
+  "name": "MakeMyClick Dispatch",
+  "short_name": "MakeMyClick",
+  "description": "MakeMyClick Dispatch Management System",
+  "start_url": "/#/mobile/orders",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Orders",
+      "url": "/#/mobile/orders",
+      "description": "View active orders"
+    }
+  ]
+}

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL to CSV Converter V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center h-screen font-sans text-gray-800">
+    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-200 max-w-lg w-full text-center">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">SQL to CSV Converter V3</h1>
+        <p class="text-sm text-gray-500 mb-6">Select your <code class="bg-gray-100 px-1 rounded text-pink-600">migration.sql</code> file again. The bug is squashed!</p>
+        <label class="block w-full cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition">
+            <span>Select migration.sql</span>
+            <input type="file" id="fileInput" accept=".sql" class="hidden" />
+        </label>
+        <div id="output" class="mt-6 space-y-3"></div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const text = await file.text();
+            const output = document.getElementById('output');
+            output.innerHTML = '<p class="text-sm text-indigo-600 font-bold animate-pulse">Parsing and formatting JSON...</p>';
+
+            setTimeout(() => {
+                try {
+                    const insertRegex = /INSERT INTO\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)\s*VALUES\s*([\s\S]*?)(?:ON CONFLICT[^;]*;|;)/gi;
+                    const tables = {};
+                    let match;
+
+                    while ((match = insertRegex.exec(text)) !== null) {
+                        const tableName = match[1];
+                        const cols = match[2].split(',').map(s => s.trim());
+                        const valuesString = match[3];
+
+                        if (!tables[tableName]) tables[tableName] = { headers: cols, rows: [] };
+
+                        let inString = false;
+                        let currentVal = "";
+                        let parenDepth = 0;
+                        let currentTuple = [];
+
+                        for(let i=0; i<valuesString.length; i++) {
+                            let char = valuesString[i];
+                            if (char === "'") {
+                                if (inString && valuesString[i+1] === "'") { currentVal += "''"; i++; continue; }
+                                inString = !inString;
+                                currentVal += char;
+                            } else if (!inString && char === '(') {
+                                parenDepth++;
+                                if (parenDepth > 1) currentVal += char;
+                            } else if (!inString && char === ')') {
+                                parenDepth--;
+                                if (parenDepth === 0) {
+                                    currentTuple.push(cleanVal(currentVal));
+                                    tables[tableName].rows.push(currentTuple);
+                                    currentTuple = []; currentVal = "";
+                                } else { currentVal += char; }
+                            } else if (!inString && char === ',') {
+                                if (parenDepth === 1) { currentTuple.push(cleanVal(currentVal)); currentVal = ""; } 
+                                else if (parenDepth > 1) { currentVal += char; }
+                            } else {
+                                if (parenDepth >= 1) currentVal += char;
+                            }
+                        }
+                    }
+
+                    output.innerHTML = '<p class="text-sm text-green-600 font-bold mb-3">✅ Extraction Complete!</p>';
+                    
+                    for(let tableName in tables) {
+                        const data = tables[tableName];
+                        let csvContent = data.headers.join(',') + '\n';
+                        
+                        data.rows.forEach(row => {
+                            let csvRow = row.map(v => {
+                                let str = String(v);
+                                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                                    str = '"' + str.replace(/"/g, '""') + '"';
+                                }
+                                return str;
+                            });
+                            csvContent += csvRow.join(',') + '\n';
+                        });
+
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const btn = document.createElement('a');
+                        btn.href = url;
+                        btn.download = `${tableName}.csv`;
+                        btn.className = "block w-full bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 font-semibold py-2 px-4 rounded transition flex justify-between";
+                        btn.innerHTML = `<span>📥 ${tableName}.csv</span> <span class="text-gray-500">${data.rows.length} rows</span>`;
+                        output.appendChild(btn);
+                    }
+                } catch (error) {
+                    output.innerHTML = `<p class="text-sm text-red-600 font-bold">Error: ${error.message}</p>`;
+                }
+            }, 100); // Small timeout to let UI update
+        });
+
+        function cleanVal(v) {
+            v = v.trim();
+            if (v.toUpperCase() === 'NULL') return '';
+            if (v === 'true' || v === 'false') return v;
+            
+            // Convert jsonb_build_object to actual JSON string
+            if (v.startsWith('jsonb_build_object(')) {
+                let argsStr = v.substring(19, v.length - 1);
+                let args = []; let inQ = false; let curr = "";
+                for (let i=0; i<argsStr.length; i++) {
+                    if (argsStr[i] === "'") inQ = !inQ;
+                    else if (argsStr[i] === ',' && !inQ) { 
+                        args.push(curr.trim()); // FIXED: changed .append() to .push()
+                        curr = ""; 
+                        continue; 
+                    }
+                    curr += argsStr[i];
+                }
+                if (curr) args.push(curr.trim());
+                
+                let obj = {};
+                for (let i=0; i<args.length; i+=2) {
+                    if (!args[i]) continue;
+                    let key = args[i].replace(/^'|'$/g, "");
+                    let val = i+1 < args.length ? args[i+1] : "";
+                    
+                    if (val.startsWith("'") && val.endsWith("'")) obj[key] = val.replace(/^'|'$/g, "");
+                    else if (val === 'true') obj[key] = true;
+                    else if (val === 'false') obj[key] = false;
+                    else if (val === 'null') obj[key] = null;
+                    else obj[key] = Number(val) || val;
+                }
+                return JSON.stringify(obj);
+            }
+
+            let coalesceMatch = v.match(/COALESCE\(\s*'([^']+)'/i);
+            if (coalesceMatch) return coalesceMatch[1];
+            let stringMatch = v.match(/^'([\s\S]*)'(?:::[\w_]+)?$/);
+            if (stringMatch) return stringMatch[1].replace(/''/g, "'");
+            return v;
+        }
+    </script>
+</body>
+</html>
