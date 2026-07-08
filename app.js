@@ -104,26 +104,62 @@ document.addEventListener('DOMContentLoaded', async () => {
     router();
 });
 
+// Real-time, event-driven updates — Supabase pushes a message the instant
+// a row changes; nothing here polls or re-hits the API on a timer. Covers:
+// new orders, step completions, and new evidence/proof submissions —
+// refreshing whichever view is currently open (dashboard/orders/board/
+// mobile list), plus the order drawer itself if it's open on the affected order.
 function setupRealtime() {
     let __realtimeTimer = null;
-    const debouncedRouter = () => {
+    const debouncedRefresh = () => {
         clearTimeout(__realtimeTimer);
-        __realtimeTimer = setTimeout(() => router(), 1500);
+        __realtimeTimer = setTimeout(refreshCurrentView_, 800);
     };
 
     window.db.supabase.channel('public:orders')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-            if (['#/orders', '#/dashboard', '#/board'].includes(location.hash)) debouncedRouter();
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+            debouncedRefresh();
+            refreshOpenDrawerIfMatches_(payload.new?.id || payload.old?.id);
         }).subscribe();
 
     window.db.supabase.channel('public:order_step_status')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_step_status' }, () => {
-            if (location.hash === '#/board') debouncedRouter();
-            const openId = document.getElementById('order-drawer')?.dataset?.orderId;
-            if (openId) openOrderDrawer(openId);
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_step_status' }, (payload) => {
+            debouncedRefresh();
+            refreshOpenDrawerIfMatches_(payload.new?.order_id || payload.old?.order_id);
         }).subscribe();
 
+    // New evidence/proof lands here — this is what was previously NOT
+    // being listened to at all, so a submitted step's file/notes wouldn't
+    // trigger anything on their own beyond the order_step_status row change.
+    window.db.supabase.channel('public:step_submissions')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'step_submissions' }, (payload) => {
+            debouncedRefresh();
+            refreshOpenDrawerIfMatches_(payload.new?.order_id);
+        }).subscribe();
 }
+
+function refreshCurrentView_() {
+    // Skip if a modal is actively open — don't yank the screen from under a user mid-form.
+    if (document.querySelector('#step-modal')) return;
+    const hash = location.hash || '#/dashboard';
+    if (hash === '#/mobile/orders') {
+        renderMobileOrders(document.getElementById('main-content'));
+    } else if (['#/orders', '#/dashboard', '#/board'].includes(hash)) {
+        router();
+    }
+}
+
+function refreshOpenDrawerIfMatches_(orderId) {
+    if (!orderId) return;
+    const openId = document.getElementById('order-drawer')?.dataset?.orderId;
+    if (openId === orderId) openOrderDrawer(orderId);
+}
+
+// One-shot catch-up when the tab regains focus (e.g. after being backgrounded
+// long enough for the websocket to lapse) — not a repeating timer.
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshCurrentView_();
+});
 
 // ==========================================
 // ROUTER
@@ -3093,104 +3129,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// AUTO-REFRESH — Silent background updates
+// LIVE INDICATOR — reflects real-time push status, no polling timer
 // ==========================================
-
-const AutoRefresh = {
-    intervalId: null,
-    intervalMs: 30000,
-    lastRefresh: 0,
-
-    init() {
-        this.start();
-
-        // Pause when tab hidden (saves battery)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                this.pause();
-            } else {
-                this.resume();
-                this.refreshNow();
-            }
-        });
-
-        window.addEventListener('offline', () => this.pause());
-        window.addEventListener('online', () => {
-            this.resume();
-            showToast('Back online', 'success');
-        });
-    },
-
-    start() {
-        if (this.intervalId) clearInterval(this.intervalId);
-        this.intervalId = setInterval(() => this.refreshNow(), this.intervalMs);
-    },
-
-    pause() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
-    },
-
-    resume() {
-        if (!this.intervalId) this.start();
-    },
-
-    async refreshNow() {
-        // Skip if drawer or modal is open
-        if (document.querySelector('#order-drawer.open')) return;
-        if (document.querySelector('#step-modal')) return;
-
-        // Rate limit
-        if (Date.now() - this.lastRefresh < 10000) return;
-        this.lastRefresh = Date.now();
-
-        try {
-            // Re-render current page silently (no loading spinner)
-            const hash = location.hash || '#/dashboard';
-            const main = document.getElementById('main-content');
-            if (!main) return;
-
-            if (hash === '#/mobile/orders') {
-                await renderMobileOrders(main);
-            } else if (['#/orders', '#/dashboard', '#/board'].includes(hash)) {
-                await router();
-            }
-        } catch (e) {
-            console.error('Auto-refresh error:', e);
-        }
-    },
-
-    toggle() {
-        if (this.intervalId) {
-            this.pause();
-            showToast('Auto-refresh paused', 'info');
-            const dot = document.querySelector('#auto-refresh-indicator .ar-dot');
-            if (dot) dot.style.background = '#9ca3af';
-        } else {
-            this.start();
-            this.refreshNow();
-            showToast('Auto-refresh on', 'success');
-            const dot = document.querySelector('#auto-refresh-indicator .ar-dot');
-            if (dot) dot.style.background = '#10b981';
-        }
-    }
-};
-
 function addAutoRefreshIndicator() {
     if (document.getElementById('auto-refresh-indicator')) return;
     const indicator = document.createElement('div');
     indicator.id = 'auto-refresh-indicator';
-    indicator.innerHTML = '<span class="ar-dot"></span> Auto';
-    indicator.title = 'Click to toggle auto-refresh';
-    indicator.onclick = () => AutoRefresh.toggle();
+    indicator.innerHTML = '<span class="ar-dot"></span> Live';
+    indicator.title = 'Updates arrive automatically — no manual refresh needed';
     document.body.appendChild(indicator);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        AutoRefresh.init();
-        addAutoRefreshIndicator();
-    }, 3000);
+    setTimeout(addAutoRefreshIndicator, 3000);
 });
