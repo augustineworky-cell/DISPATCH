@@ -5,78 +5,68 @@
 
 let currentUser = null;
 let currentOrgId = null;
-const GEMINI_API_KEY = 'AIzaSyDW2tyzNbN9K0mSiSBNM11bGQRYnuWeIMs';
 
-const stepsDirectory = [
-    'STEP2_EMAIL_PRODUCTION',
-    'STEP3_STOCK_UPDATE',
-    'STEP4_PDI_CHECKLIST',
-    'STEP5_VIDEO_CUSTOMER',
-    'STEP6_TRANSPORT_CHARGES',
-    'STEP7_DISPATCH_TRACKING'
+// Populated at runtime by loadStepConfig() from the step_definitions table —
+// BMH's 6-step workflow (PI → Payment → Packing → Transport → LR), not
+// hardcoded MMC steps. Colors/icons aren't in the DB, so they're assigned
+// client-side from a fixed palette by position.
+let stepsDirectory = [];
+let stepLabels = {};
+
+const STEP_VISUAL_PALETTE = [
+    { color: '#3b82f6', icon: 'file-text' },      // STEP2_PI_CREATED
+    { color: '#8b5cf6', icon: 'check-circle' },   // STEP3_PAYMENT_CONFIRMED
+    { color: '#ec4899', icon: 'send' },           // STEP4_SENT_TO_PACKING
+    { color: '#f97316', icon: 'package' },        // STEP5_PACKING_DONE
+    { color: '#10b981', icon: 'banknote' },       // STEP6_TRANSPORT_CHARGES
+    { color: '#0284c7', icon: 'truck' },          // STEP7_LR_GENERATED
 ];
 
-const stepLabels = {
-    'STEP2_EMAIL_PRODUCTION':  {
-        en: 'Email to Production',
-        hi: 'प्रोडक्शन को ईमेल',
-        hint_en: 'Agar order PRINTING ya BLANK AND PRINTED ka hai, to yahaan production head ko mail karo taaki vo apna kaam shuru kare.',
-        hint_hi: 'अगर ऑर्डर PRINTING या BLANK AND PRINTED का है, तो यहाँ प्रोडक्शन हेड को मेल करो ताकि वो अपना काम शुरू करे।',
-        color: '#3b82f6', icon: 'mail',
-        needsEvidence: true,
-        situational: true      // ← hidden when order_type === 'BLANK'
-    },
-    'STEP3_STOCK_UPDATE':      {
-        en: 'Stock / Production Status & Lead Time',
-        hi: 'स्टॉक और प्रोडक्शन स्थिति · लीड टाइम',
-        hint_en: 'Stock aur production ka status check karke CRM ko lead time call karke batao.',
-        hint_hi: 'स्टॉक और प्रोडक्शन की स्थिति देखकर CRM को लीड टाइम कॉल करके बताओ।',
-        color: '#8b5cf6', icon: 'phone-call',
-        needsEvidence: false   // ← NO file upload; lead time only
-    },
-    'STEP4_PDI_CHECKLIST':     {
-        en: 'PDI Packing Checklist',
-        hi: 'PDI पैकिंग चेकलिस्ट',
-        hint_en: 'Dispatch head packing team ke saath mil ke packing start karega — PDC4 checklist ke according.',
-        hint_hi: 'डिस्पैच हेड पैकिंग टीम के साथ मिलकर पैकिंग शुरू करेगा — PDC4 चेकलिस्ट के अनुसार।',
-        color: '#ec4899', icon: 'clipboard-check',
-        needsEvidence: true
-    },
-    'STEP5_VIDEO_CUSTOMER':    {
-        en: 'Send Video to Customer + Get Address',
-        hi: 'कस्टमर को वीडियो भेजो + एड्रेस लो',
-        hint_en: 'Jo video/photo liya tha, customer ko bhejo aur usse address + dispatch detail confirm karo.',
-        hint_hi: 'जो वीडियो/फोटो लिया था, कस्टमर को भेजो और उससे एड्रेस + डिस्पैच डिटेल कन्फर्म करो।',
-        color: '#f97316', icon: 'video',
-        needsEvidence: true
-    },
-    'STEP6_TRANSPORT_CHARGES': {
-        en: 'Transport Charges to Customer',
-        hi: 'कस्टमर को ट्रांसपोर्ट चार्जेस',
-        hint_en: 'Customer ko transport charges update karo aur amount company account me mangwao.',
-        hint_hi: 'कस्टमर को ट्रांसपोर्ट चार्जेस अपडेट करो और अमाउंट कंपनी अकाउंट में मंगवाओ।',
-        color: '#10b981', icon: 'banknote',
-        needsEvidence: true
-    },
-    'STEP7_DISPATCH_TRACKING': {
-        en: 'Dispatch Done + Share Tracking',
-        hi: 'डिस्पैच हो गया · ट्रैकिंग शेयर करो',
-        hint_en: 'Dispatch done. Tracking ID customer aur CRM ko share karo.',
-        hint_hi: 'डिस्पैच हो गया। ट्रैकिंग ID कस्टमर और CRM को शेयर करो।',
-        color: '#0284c7', icon: 'send',
-        needsEvidence: true
-    }
-};
+async function loadStepConfig() {
+    const defs = await window.db.getStepDefinitions();
+    // STEP1 is excluded — it's marked DONE automatically by the create_order
+    // RPC (the order form submission IS step1), so it's never a user-submittable
+    // step in the drawer/kanban.
+    const submittable = defs.filter(d => d.step_code !== 'STEP1_ORDER_RECEIVED');
 
-// ─── STEP TRANSLATION HELPERS ──────────────────────
+    stepsDirectory = submittable.map(d => d.step_code);
+    stepLabels = {};
+    submittable.forEach((d, i) => {
+        const visual = STEP_VISUAL_PALETTE[i] || { color: '#4f46e5', icon: 'circle' };
+        stepLabels[d.step_code] = {
+            en: d.step_name,
+            hi: d.step_name,
+            color: visual.color,
+            icon: visual.icon,
+            needsEvidence: true,   // every BMH step requires a proof upload
+            formCode: d.form_code,
+            slaHours: d.sla_hours,
+            ownerRole: d.owner_role
+        };
+    });
+}
+
+// ─── STEP HELPERS ──────────────────────
+// No per-step Hinglish hint copy for BMH (forms are generic) — shows the
+// responsible role + form code + SLA instead.
 function stepHint(code) {
-    const lang = localStorage.getItem('mmc_lang') || 'en';
-    return stepLabels[code]?.[`hint_${lang}`] || '';
+    const cfg = stepLabels[code];
+    return cfg ? `${cfg.ownerRole.toUpperCase()} · Form ${cfg.formCode} · SLA ${cfg.slaHours}h` : '';
 }
 
 function stepName(code) {
-    const lang = localStorage.getItem('mmc_lang') || 'en';
-    return stepLabels[code]?.[lang] || code;
+    return stepLabels[code]?.en || code;
+}
+
+// Real global mobile-detection function — PullToRefresh.init() calls this.
+// (Pre-existing bug in the original file: isMobile was only ever a local
+// variable computed inline elsewhere, never a real function, so this call
+// always threw ReferenceError before this fix.)
+function isMobile() {
+    const isMobileUA = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isMobileWidth = window.innerWidth < 768;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    return isMobileUA || isMobileWidth || (isTouchDevice && window.innerWidth < 1024);
 }
 
 // ==========================================
@@ -93,6 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             location.hash = '#/login';
         } else {
             currentOrgId = currentUser.organization_id;
+            await loadStepConfig();   // must resolve before router() renders any step-related UI
             setupRealtime();
             
             // 📱 Auto-detect mobile — MULTIPLE checks
@@ -132,11 +123,6 @@ function setupRealtime() {
             if (openId) openOrderDrawer(openId);
         }).subscribe();
 
-    window.db.supabase.channel('public:pending_orders')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_orders' }, () => {
-            if (location.hash === '#/pending') debouncedRouter();
-            updatePendingBadge();
-        }).subscribe();
 }
 
 // ==========================================
@@ -172,7 +158,6 @@ async function router() {
         else if (hash === '#/orders/new') await renderNewOrder(main);
         else if (hash === '#/customers') await renderCustomers(main);
         else if (hash === '#/analytics') await renderAnalytics(main);
-        else if (hash === '#/pending') await renderPendingQueue(main);
         else if (hash === '#/mobile') await renderMobileHome(main);
         else if (hash === '#/mobile/orders') await renderMobileOrders(main);
         else main.innerHTML = '<div class="p-8 text-center text-gray-500">Page not found.</div>';
@@ -194,8 +179,8 @@ function renderSidebar() {
     return `
         <aside class="w-64 sidebar-gradient text-white flex flex-col h-full hidden md:flex shadow-xl z-20">
             <div class="p-6 flex items-center gap-3 border-b border-white/10">
-                <img src="/web-app-manifest-192x192.png" alt="MakeMyClick" class="w-10 h-10 rounded-lg">
-                <h1 class="font-bold text-xl tracking-tight text-white">MakeMyClick</h1>
+                <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-lg">
+                <h1 class="font-bold text-xl tracking-tight text-white">BMH Dispatch</h1>
             </div>
             <nav class="flex-1 px-4 py-6 space-y-1.5">
                 <div class="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-2 px-2">Workspace</div>
@@ -204,11 +189,6 @@ function renderSidebar() {
                 ${navItem('#/orders', 'shopping-cart', t('orders'), path.includes('orders') && !path.includes('new'))}
                 ${navItem('#/customers', 'users', 'Customers', path.includes('customers'))}
                 ${navItem('#/analytics', 'bar-chart-3', 'Analytics', path.includes('analytics'))}
-                <a href="#/pending" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors ${path.includes('pending') ? 'bg-indigo-600 shadow-md text-white' : 'text-indigo-100'}">
-                    <i data-lucide="inbox" class="w-5 h-5"></i>
-                    <span class="flex-1">Pending Queue</span>
-                    <span id="pending-badge" class="hidden bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"></span>
-                </a>
             </nav>
             <div class="p-4 bg-black/20 backdrop-blur-sm m-4 rounded-xl border border-white/10">
                 <div class="flex items-center gap-3">
@@ -388,7 +368,7 @@ function renderLoginUI() {
                         <img src="/web-app-manifest-192x192.png" alt="MMC"
                              class="w-10 h-10 rounded-xl shadow-lg shadow-black/40">
                         <div>
-                            <div class="text-white font-extrabold text-lg leading-tight">MakeMyClick</div>
+                            <div class="text-white font-extrabold text-lg leading-tight">BMH Dispatch</div>
                             <div class="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Dispatch OS</div>
                         </div>
                     </div>
@@ -421,7 +401,7 @@ function renderLoginUI() {
                 </div>
 
                 <div class="relative z-10 px-10 pb-8 text-indigo-400/50 text-xs">
-                    © ${new Date().getFullYear()} MakeMyClick · All rights reserved
+                    © ${new Date().getFullYear()} Bansal Metrial House · All rights reserved
                 </div>
             </div>
 
@@ -432,7 +412,7 @@ function renderLoginUI() {
                 <div class="flex md:hidden items-center gap-2.5 mb-8">
                     <img src="/web-app-manifest-192x192.png" alt="MMC" class="w-9 h-9 rounded-xl shadow">
                     <div>
-                        <div class="text-gray-900 font-extrabold text-base leading-tight">MakeMyClick</div>
+                        <div class="text-gray-900 font-extrabold text-base leading-tight">BMH Dispatch</div>
                         <div class="text-indigo-500 text-[10px] font-bold tracking-widest uppercase">Dispatch OS</div>
                     </div>
                 </div>
@@ -797,84 +777,59 @@ async function renderOrders(container) {
 // ==========================================
 async function renderNewOrder(container) {
     container.innerHTML = renderLoadingState();
-    const [customers, salesUsers] = await Promise.all([window.db.getCustomers(), window.db.getSalesUsers()]);
+    const salesUsers = await window.db.getSalesUsers();
     container.innerHTML = `
         <div class="max-w-3xl mx-auto animate-in">
             <button onclick="history.back()" class="text-sm font-semibold text-gray-500 hover:text-gray-900 mb-6 flex items-center gap-1">
                 <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
             </button>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-<div class="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center flex-wrap gap-4">
-                    <div>
-                        <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Create New Order (OD1)</h2>
-                        <p class="text-sm text-gray-500 mt-1">Fill manually or let AI extract details from the Challan.</p>
-                    </div>
-                    <button type="button" id="btn-ai-challan" class="bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200 font-bold text-sm px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 transition">
-                        ✨ Auto-fill with AI
-                    </button>
-                    <input type="file" id="ai-challan-file-input" class="hidden" accept=".pdf,image/*">
+                <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+                    <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Create New Order (OR1)</h2>
+                    <p class="text-sm text-gray-500 mt-1">Order code is generated automatically once submitted.</p>
                 </div>
                 <form onsubmit="handleCreateOrder(event)" class="p-8 space-y-6">
                     <div class="grid grid-cols-2 gap-6">
-                    <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Order ID *</label>
-                            <div class="relative">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400 pointer-events-none">MMC-</span>
-                                <input type="text" id="no_order_id" required placeholder="e.g. 638" autocomplete="off"
-                                       pattern="[0-9]+"
-                                       inputmode="numeric"
-                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                                       class="w-full pl-14 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none font-mono">
-                            </div>
-                            <p class="text-[11px] text-gray-400 mt-1">Type just the number (auto-prefixed with MMC-)</p>
-                        </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Name *</label>
-                            <input type="text" id="no_customer_name" required placeholder="Type customer name..." autocomplete="off"
+                            <input type="text" id="no_customer_name" required placeholder="Company / customer name..." autocomplete="off"
                                    class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
-    <label class="block text-sm font-semibold text-gray-700 mb-2">Sales Person *</label>
-    <select id="no_sales" required onchange="handleSalesChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-        <option value="" disabled selected>Assign sales...</option>
-        <option value="Shreya">Shreya</option>
-        <option value="Vandana">Vandana</option>
-        <option value="Vikash">Vikash</option>
-        <option value="Rajeev">Rajeev</option>
-        <option value="Akash">Akash</option>
-        <option value="Sanchit">Sanchit</option>
-        <option value="__OTHER__">+ Others (type name)</option>
-    </select>
-    <input type="text" id="no_sales_custom" placeholder="Enter sales person name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
-</div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Contact Person</label>
+                            <input type="text" id="no_contact_person" placeholder="e.g. Shreya" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Phone</label>
                             <input type="tel" id="no_phone" placeholder="9876543210" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Order Value (₹) *</label>
-                            <input type="number" step="0.01" id="no_value" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">City</label>
+                            <input type="text" id="no_city" placeholder="e.g. Delhi" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Type of Order *</label>
-                            <select id="no_type" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <option value="BLANK">BLANK</option>
-                                <option value="PRINTED">PRINTED</option>
-                                <option value="BLANK AND PRINTED">BLANK AND PRINTED</option>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Payment Type *</label>
+                            <select id="no_payment_type" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="ADVANCE">ADVANCE</option>
+                                <option value="CREDIT">CREDIT</option>
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Dispatch Mode</label>
-                            <select id="no_mode" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <option value="PORTER">PORTER</option><option value="SELF">SELF</option>
-                                <option value="DTDC">DTDC</option><option value="DELIVERY">DELIVERY</option>
-                                <option value="CARGO">CARGO</option><option value="BUS">BUS</option>
-                                <option value="TRACKON">TRACKON</option><option value="OTHER">OTHER</option>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Dispatch Mode *</label>
+                            <select id="no_mode" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="PORTER">PORTER</option>
+                                <option value="TEMPO">TEMPO</option>
+                                <option value="RICKSHAW">RICKSHAW</option>
                             </select>
                         </div>
-                        <div class="col-span-2">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Delivery Challan (PDF/Image) *</label>
-                            <input type="file" id="no_file" accept=".pdf,image/*" required class="w-full border border-gray-300 rounded-lg p-2 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Sales Person *</label>
+                            <select id="no_sales" required onchange="handleSalesChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="" disabled selected>Assign sales...</option>
+                                ${(salesUsers || []).map(u => `<option value="${escapeHtml(u.full_name)}">${escapeHtml(u.full_name)}</option>`).join('')}
+                                <option value="__OTHER__">+ Others (type name)</option>
+                            </select>
+                            <input type="text" id="no_sales_custom" placeholder="Enter sales person name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                     </div>
                     <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
@@ -882,48 +837,10 @@ async function renderNewOrder(container) {
                         <button type="submit" id="no_submit_btn" class="px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md flex items-center gap-2">
                             <i data-lucide="check" class="w-4 h-4"></i> ${t('create_order')}
                         </button>
-</div>
+                    </div>
                 </form>
             </div>
         </div>`;
-
-    // --- AI CHALLAN EXTRACTION LOGIC ---
-    setTimeout(() => {
-        const aiBtn = document.getElementById('btn-ai-challan');
-        const fileInput = document.getElementById('ai-challan-file-input');
-        
-        if (aiBtn && fileInput) {
-            aiBtn.addEventListener('click', () => fileInput.click());
-
-            fileInput.addEventListener('change', async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                aiBtn.disabled = true;
-                aiBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline"></i> Reading Challan...';
-                lucide.createIcons();
-                
-                try {
-                    // Call the global AI parser
-                    const aiData = await window.parseChallanWithAI(file);
-                    
-                    // Auto-fill the form fields
-                    if (aiData.customer_name) document.getElementById('no_customer_name').value = aiData.customer_name;
-                    if (aiData.customer_phone) document.getElementById('no_phone').value = aiData.customer_phone;
-                    if (aiData.order_value) document.getElementById('no_value').value = aiData.order_value;
-                    if (aiData.order_id) document.getElementById('no_order_id').value = String(aiData.order_id).replace(/\D/g, ''); // Strips out letters, keeps numbers
-                    
-                    showToast('Challan data extracted successfully!', 'success');
-                } catch (err) {
-                    showToast('AI Extraction failed: ' + err.message, 'error');
-                } finally {
-                    aiBtn.disabled = false;
-                    aiBtn.innerHTML = '✨ Auto-fill with AI';
-                    e.target.value = ''; // Reset input
-                }
-            });
-        }
-    }, 100);
 }
 
 // ==========================================
@@ -1198,42 +1115,14 @@ function renderDrawerStep(step, order, latestSub) {
             </div>
         </div>`;
 
+    // BMH's forms are generic (proof file + notes for every step), so the
+    // preview is just the notes text if any was entered — no per-step
+    // custom fields like MMC's lead_time/PDI-checklist/charges_amount/tracking_id.
     let dataPreview = '';
-    if (isDone && latestSub?.form_data) {
-        const d = latestSub.form_data;
-        if (code === 'STEP3_STOCK_UPDATE' && d.lead_time) {
-            dataPreview += `<div class="ml-12 mt-2 inline-flex items-center gap-1.5 text-xs text-purple-700 bg-purple-50 px-2 py-1 rounded font-semibold">
-                <i data-lucide="clock" class="w-3 h-3"></i> Lead Time: ${d.lead_time} day${d.lead_time > 1 ? 's' : ''}
-            </div>`;
-        }
-        if (code === 'STEP4_PDI_CHECKLIST') {
-            const checks = [
-                { key: 'quality_check', label: 'Quality' },
-                { key: 'quantity_check', label: 'Quantity' },
-                { key: 'damage_check', label: 'Damage' },
-                { key: 'documentation', label: 'Docs' }
-            ];
-            dataPreview += `<div class="ml-12 mt-2 flex flex-wrap gap-1">
-                ${checks.map(c => `<span class="text-[10px] font-bold px-2 py-0.5 rounded ${d[c.key] ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}">${d[c.key] ? '✓' : '✗'} ${c.label}</span>`).join('')}
-                ${d.dimensions ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">📐 ${d.dimensions}</span>` : ''}
-            </div>`;
-        }
-        if (code === 'STEP5_VIDEO_CUSTOMER' && d.dispatch_address) {
-            dataPreview += `<div class="ml-12 mt-2 text-[11px] text-gray-700 bg-orange-50 p-2 rounded border-l-2 border-orange-300">
-                📍 <strong>Address:</strong> ${d.dispatch_address}
-            </div>`;
-        }
-        if (code === 'STEP6_TRANSPORT_CHARGES' && d.charges_amount) {
-            dataPreview += `<div class="ml-12 mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded font-semibold font-mono">
-                💰 ₹${formatINR(d.charges_amount)}
-            </div>`;
-        }
-        if (code === 'STEP7_DISPATCH_TRACKING') {
-            dataPreview += `<div class="ml-12 mt-2 flex flex-wrap gap-1.5">
-                ${d.tracking_id ? `<span class="text-xs font-mono font-bold text-cyan-700 bg-cyan-50 px-2 py-1 rounded">📦 ${d.tracking_id}</span>` : ''}
-                ${d.transport_mode ? `<span class="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">🚚 ${d.transport_mode}</span>` : ''}
-            </div>`;
-        }
+    if (isDone && latestSub?.form_data?.notes) {
+        dataPreview = `<div class="ml-12 mt-2 text-[11px] text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300 italic">
+            📝 ${escapeHtml(latestSub.form_data.notes)}
+        </div>`;
     }
 
     // ─── File row (auto-detects ALL files in form_data) ───
@@ -1321,10 +1210,7 @@ function renderDrawerStep(step, order, latestSub) {
         </div>`;
 }
 
-// ==========================================
-// STEP MODAL (Submit Forms)
-// ==========================================
-window.openStepModal = function(orderId, stepCode, orderType) {
+window.openStepModal = function(orderId, stepCode) {
     let container = document.getElementById('step-modal-container');
     if (!container) {
         document.body.insertAdjacentHTML('beforeend', '<div id="step-modal-container"></div>');
@@ -1332,159 +1218,23 @@ window.openStepModal = function(orderId, stepCode, orderType) {
     }
 
     const cfg = stepLabels[stepCode] || {};
-    let fields = '';
-    let bucket = 'packing-proofs';
+    const bucket = 'bmh-proofs';   // single bucket for every step, per schema.sql
 
-    if (stepCode === 'STEP2_EMAIL_PRODUCTION') {
-        bucket = 'email-proofs';
-        fields = `
-            <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 text-xs text-indigo-900 italic leading-relaxed">
-                💡 ${stepHint(stepCode)}
-            </div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Email Screenshot / PDF *</label>
-            <input type="file" id="form-file" accept="image/*,.pdf" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
-            <p class="text-[11px] text-gray-500 mt-2">Upload the email you sent to Production Head</p>`;
-    }
-    else if (stepCode === 'STEP3_STOCK_UPDATE') {
-        fields = `
-            <div class="bg-purple-50 border border-purple-100 rounded-lg p-3 mb-4 text-xs text-purple-900 italic leading-relaxed">
-                💡 ${stepHint(stepCode)}
-            </div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Lead Time (Days) *</label>
-            <input type="number" id="form-lead-time" min="1" placeholder="e.g. 5" required class="w-full border rounded-lg p-2.5 mb-4 text-sm">
-            <label class="flex items-center gap-3 p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-indigo-400">
-                <input type="checkbox" id="form-crm-called" required class="w-4 h-4 text-indigo-600 rounded">
-                <div>
-                    <span class="text-sm font-semibold text-gray-800">CRM ko call karke lead time bata diya</span>
-                    <p class="text-[11px] text-gray-500">Confirm CRM team was informed by phone</p>
-                </div>
-            </label>
-            <textarea id="form-notes" placeholder="Any notes (optional)" class="w-full mt-3 border rounded-lg p-2 text-sm h-16"></textarea>`;
-    }
-    else if (stepCode === 'STEP4_PDI_CHECKLIST') {
-        bucket = 'packing-proofs';
-        fields = `
-            <div class="bg-pink-50 border border-pink-100 rounded-lg p-3 mb-4 text-xs text-pink-900 italic leading-relaxed">
-                💡 ${stepHint(stepCode)}
-            </div>
-            <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                <div class="font-bold text-xs text-gray-700 uppercase tracking-wider mt-1">Quality Checks</div>
-                <label class="flex items-start gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100">
-                    <input type="checkbox" required class="form-cbx mt-0.5 w-4 h-4 text-indigo-600" data-key="quality_check">
-                    <div>
-                        <span class="text-sm font-semibold">Quality Check Done</span>
-                        <p class="text-[11px] text-gray-500 italic">Quality check kar loh, kuch fata futa toh nhi</p>
-                    </div>
-                </label>
-                <label class="flex items-start gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100">
-                    <input type="checkbox" required class="form-cbx mt-0.5 w-4 h-4 text-indigo-600" data-key="quantity_check">
-                    <div>
-                        <span class="text-sm font-semibold">Quantity Check Done</span>
-                        <p class="text-[11px] text-gray-500 italic">Ek baar ginti kar lo (count once more). Challan ke according sab match hai?</p>
-                    </div>
-                </label>
-                <label class="flex items-start gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100">
-                    <input type="checkbox" required class="form-cbx mt-0.5 w-4 h-4 text-indigo-600" data-key="damage_check">
-                    <div>
-                        <span class="text-sm font-semibold">Damage Control Done</span>
-                        <p class="text-[11px] text-gray-500 italic">Toot-phoot check karo. Fragile items ke liye gentle shake test bhi.</p>
-                    </div>
-                </label>
-                <label class="flex items-start gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100">
-                    <input type="checkbox" required class="form-cbx mt-0.5 w-4 h-4 text-indigo-600" data-key="documentation">
-                    <div>
-                        <span class="text-sm font-semibold">Documentation Complete</span>
-                        <p class="text-[11px] text-gray-500 italic">Paperwork poora hai? Har box pe Challan & Address Label stuck firmly.</p>
-                    </div>
-                </label>
-                <div class="font-bold text-xs text-gray-700 uppercase tracking-wider mt-3">Details</div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Dimensions (L×W×H) *</label>
-                    <input type="text" id="form-dim" required placeholder="60x40x40" class="w-full border rounded-lg p-2 text-sm">
-                    <p class="text-[10px] text-gray-400 mt-0.5 italic">Sare dimension check kar ke submit karo</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Name Clarification *</label>
-                    <input type="text" id="form-name-clarify" required placeholder="Order name as packed" class="w-full border rounded-lg p-2 text-sm">
-                    <p class="text-[10px] text-gray-400 mt-0.5 italic">Ek baar naam check kar lo — jo logo neh order pack kiya ha</p>
-                </div>
-                <div class="font-bold text-xs text-gray-700 uppercase tracking-wider mt-3">Uploads</div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Proof of Packing (Photo) *</label>
-                    <input type="file" id="form-file" accept="image/*" required class="w-full border rounded-lg p-2 text-sm bg-white">
-                    <p class="text-[10px] text-gray-400 mt-0.5 italic">Box me sahi se pack hua hai ya nhi — uska photo</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Video / Photo (Optional)</label>
-                    <input type="file" id="form-video" accept="image/*,video/*" class="w-full border rounded-lg p-2 text-sm bg-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Gate Pass (Optional)</label>
-                    <input type="file" id="form-gatepass" accept="image/*,.pdf" class="w-full border rounded-lg p-2 text-sm bg-white">
-                </div>
-            </div>`;
-    }
-    else if (stepCode === 'STEP5_VIDEO_CUSTOMER') {
-        bucket = 'customer-videos';
-        fields = `
-            <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 mb-4 text-xs text-orange-900 italic leading-relaxed">
-                💡 ${stepHint(stepCode)}
-            </div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Video / Photo Sent to Customer *</label>
-            <input type="file" id="form-file" accept="image/*,video/*" required class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-3">
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Dispatch Address (from customer) *</label>
-            <textarea id="form-address" required placeholder="Full address with pincode..." class="w-full border rounded-lg p-2 text-sm h-20 mb-3"></textarea>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Dispatch Detail / Notes</label>
-            <textarea id="form-dispatch-detail" placeholder="Any specific dispatch instructions from customer" class="w-full border rounded-lg p-2 text-sm h-16"></textarea>`;
-    }
-    else if (stepCode === 'STEP6_TRANSPORT_CHARGES') {
-        bucket = 'charges-proofs';
-        fields = `
-            <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-3 mb-4 text-xs text-emerald-900 italic leading-relaxed">
-                💡 ${stepHint(stepCode)}
-            </div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Transport Charges Amount (₹) *</label>
-            <input type="number" step="0.01" id="form-charges" required placeholder="1800" class="w-full border rounded-lg p-2.5 text-sm mb-3">
-            <label class="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer mb-3">
-                <input type="checkbox" id="form-amount-received" required class="w-4 h-4 text-indigo-600 rounded">
-                <span class="text-sm font-semibold text-gray-700">Amount company account me received</span>
-            </label>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Charges Proof (Receipt/Screenshot) *</label>
-            <input type="file" id="form-file" accept="image/*,.pdf" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">`;
-    }
-    else if (stepCode === 'STEP7_DISPATCH_TRACKING') {
-        bucket = 'tracking-docs';
-        fields = `
-            <div class="bg-cyan-50 border border-cyan-100 rounded-lg p-3 mb-4 text-xs text-cyan-900 italic leading-relaxed">
-                💡 ${stepHint(stepCode)}
-            </div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Tracking ID *</label>
-            <input type="text" id="form-tracking" required placeholder="e.g. BLR-789456" class="w-full border rounded-lg p-2.5 text-sm font-mono mb-3">
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Transport Mode *</label>
-            <select id="form-transport" required class="w-full border rounded-lg p-2.5 text-sm mb-3">
-                <option value="" disabled selected>Select mode...</option>
-                <option value="PORTER">🚚 PORTER</option>
-                <option value="SELF">🚶 SELF</option>
-                <option value="DTDC">📦 DTDC</option>
-                <option value="DELIVERY">🛵 DELIVERY</option>
-                <option value="CARGO">🚛 CARGO</option>
-                <option value="BUS">🚌 BUS</option>
-                <option value="TRACKON">🚚 TRACKON</option>
-            </select>
-            <label class="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer mb-3">
-                <input type="checkbox" id="form-shared-customer" required class="w-4 h-4 text-indigo-600 rounded">
-                <span class="text-sm font-semibold text-gray-700">Tracking ID Customer & CRM ko share kiya</span>
-            </label>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Tracking Document (Optional)</label>
-            <input type="file" id="form-file" accept="image/*,.pdf" class="w-full border rounded-lg p-2 text-sm bg-gray-50">`;
-    }
+    const fields = `
+        <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 text-xs text-indigo-900 leading-relaxed">
+            💡 ${stepHint(stepCode)}
+        </div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Proof File *</label>
+        <input type="file" id="form-file" accept="image/*,.pdf" required class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-3">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Notes (optional)</label>
+        <textarea id="form-notes" placeholder="Any notes for this step..." class="w-full border rounded-lg p-2 text-sm h-20"></textarea>`;
 
     container.innerHTML = `
         <div id="step-modal" class="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden border border-gray-100 flex flex-col">
                 <div class="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center flex-shrink-0">
                     <div>
-                        <h3 class="font-black text-lg text-gray-900 tracking-tight">${cfg.needsEvidence ? 'Submit Evidence' : 'Submit Info'}</h3>
+                        <h3 class="font-black text-lg text-gray-900 tracking-tight">Submit Evidence</h3>
                         <p class="text-xs font-bold text-indigo-600 mt-0.5">${stepName(stepCode)}</p>
                     </div>
                     <button onclick="closeModal()" class="text-gray-400 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-full p-1.5 transition">
@@ -1521,50 +1271,13 @@ window.submitStepForm = async function(e, orderId, stepCode, bucket) {
             submitted_at: new Date().toISOString(),
             submitted_by: currentUser.id
         };
-        const get = (id) => document.getElementById(id)?.value;
-        const checked = (id) => document.getElementById(id)?.checked;
 
-        if (get('form-lead-time'))       formData.lead_time = parseInt(get('form-lead-time'));
-        if (get('form-notes'))           formData.notes = get('form-notes');
-        if (checked('form-crm-called') !== undefined) formData.crm_called = checked('form-crm-called');
-
-        if (get('form-dim'))             formData.dimensions = get('form-dim');
-        if (get('form-name-clarify'))    formData.name_clarification = get('form-name-clarify');
-        if (get('form-address'))         formData.dispatch_address = get('form-address');
-        if (get('form-dispatch-detail')) formData.dispatch_detail = get('form-dispatch-detail');
-
-        if (get('form-charges'))         formData.charges_amount = parseFloat(get('form-charges'));
-        if (checked('form-amount-received') !== undefined) formData.amount_received = checked('form-amount-received');
-
-        if (get('form-tracking'))        formData.tracking_id = get('form-tracking');
-        if (get('form-transport'))       formData.transport_mode = get('form-transport');
-        if (checked('form-shared-customer') !== undefined) formData.shared_with_customer = checked('form-shared-customer');
-
-        document.querySelectorAll('.form-cbx').forEach(cb => {
-            formData[cb.getAttribute('data-key')] = cb.checked;
-        });
+        const notes = document.getElementById('form-notes')?.value;
+        if (notes) formData.notes = notes;
 
         const fileInput = document.getElementById('form-file');
         if (fileInput && fileInput.files.length > 0) {
             formData.file_url = await window.db.uploadFile(bucket, fileInput.files[0]);
-        }
-
-        const videoInput = document.getElementById('form-video');
-        if (videoInput && videoInput.files.length > 0) {
-            formData.video_url = await window.db.uploadFile('packing-proofs', videoInput.files[0]);
-        }
-        
-        const gatepassInput = document.getElementById('form-gatepass');
-        if (gatepassInput && gatepassInput.files.length > 0) {
-            formData.gatepass_url = await window.db.uploadFile('packing-proofs', gatepassInput.files[0]);
-        }
-
-        // Capture GPS location (silent fail if unavailable)
-        const gpsLocation = await GPS.getCurrentLocation();
-        if (gpsLocation) {
-            formData.location_lat = gpsLocation.lat;
-            formData.location_lng = gpsLocation.lng;
-            formData.location_accuracy = gpsLocation.accuracy;
         }
 
         await window.db.submitStep(orderId, stepCode, formData);
@@ -1631,51 +1344,27 @@ window.handleCreateOrder = async function(e) {
     btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline"></i> Creating...`;
     lucide.createIcons();
     try {
-        const file = document.getElementById('no_file').files[0];
-        const fileUrl = await window.db.uploadFile('delivery-challans', file);
         const salesEl = document.getElementById('no_sales');
         const customerNameInput = document.getElementById('no_customer_name').value.trim();
+        const customerPhoneInput = document.getElementById('no_phone').value.trim() || null;
 
-        // Build Order ID — user types just the number, we add MMC- prefix
-        const orderNumberInput = document.getElementById('no_order_id').value.trim();
-        if (!orderNumberInput) throw new Error('Order ID is required');
-        const orderCode = `MMC-${orderNumberInput}`;
-        const orderNumber = parseInt(orderNumberInput, 10);
+        // order_code/order_number are generated server-side by the create_order RPC
+        const customerId = await window.db.upsertCustomer(currentOrgId, customerNameInput, customerPhoneInput);
 
-        // Check if Order ID already exists
-        const { data: existing } = await window.db.supabase
-            .from('orders')
-            .select('id')
-            .eq('organization_id', currentOrgId)
-            .eq('order_code', orderCode)
-            .maybeSingle();
-
-        if (existing) {
-            throw new Error(`Order ID ${orderCode} already exists! Pick a different number.`);
-        }
-
-        // Auto-create or find customer by name (so analytics still work)
-        const customerId = await window.db.upsertCustomer(currentOrgId, customerNameInput, document.getElementById('no_phone').value || null);
-
-        const orderData = {
-            organization_id: currentOrgId,
-            order_code: orderCode,        // ← Manual code overrides trigger
-            order_number: orderNumber,    // ← Numeric value for sorting
-            customer_id: customerId,
-            customer_name: customerNameInput,
-            customer_phone: document.getElementById('no_phone').value || null,
-            
-            sales_person_name: salesEl.value === '__OTHER__' 
-    ? document.getElementById('no_sales_custom').value.trim()
-    : salesEl.value,
-            type_of_order: document.getElementById('no_type').value,
-            dispatch_mode: document.getElementById('no_mode').value,
-            order_value: parseFloat(document.getElementById('no_value').value),
-            delivery_challan_file: fileUrl,
-            current_step: 'STEP2_EMAIL_PRODUCTION',
-            created_by: currentUser.id
-        };
-        const newOrder = await window.db.createOrder(orderData);
+        const newOrder = await window.db.createOrder({
+            organizationId: currentOrgId,
+            customerId: customerId,
+            customerName: customerNameInput,
+            customerPhone: customerPhoneInput,
+            contactPerson: document.getElementById('no_contact_person').value.trim() || null,
+            city: document.getElementById('no_city').value.trim() || null,
+            paymentType: document.getElementById('no_payment_type').value,
+            dispatchMode: document.getElementById('no_mode').value,
+            salesPersonName: salesEl.value === '__OTHER__'
+                ? document.getElementById('no_sales_custom').value.trim()
+                : salesEl.value,
+            orderValue: null   // BMH's process doesn't track this — schema column stays nullable
+        });
         showToast('Order created!', 'success');
         location.hash = '#/orders';
         setTimeout(() => openOrderDrawer(newOrder.id), 400);
@@ -1802,13 +1491,11 @@ async function renderMobileOrders(container) {
 
     container.innerHTML = renderLoadingState();
 
+    // BMH has no accept/assign workflow — just show all active orders.
     const allOrders = (await window.db.getOrders()) || [];
-    const newOrders = allOrders.filter(o => o.acceptance_status === 'NEW' && !o.is_cancelled);
-    const myOrders = allOrders.filter(o => o.assigned_to === currentUser?.id && !o.is_completed && !o.is_cancelled && o.acceptance_status === 'ACCEPTED');
-    const activeOrders = allOrders.filter(o => !o.is_completed && !o.is_cancelled && o.acceptance_status === 'ACCEPTED');
+    const activeOrders = allOrders.filter(o => !o.is_completed && !o.is_cancelled);
 
-    // Store order data for bottom nav tab switching
-    window.__mobileOrderData = { myOrders, newOrders, activeOrders };
+    window.__mobileOrderData = { activeOrders };
 
     const delayedCount = activeOrders.filter(o => o.is_delayed).length;
 
@@ -1818,12 +1505,10 @@ async function renderMobileOrders(container) {
             <header class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white sticky top-0 z-30 shadow-md" style="padding-top: env(safe-area-inset-top, 0px)">
                 <div class="px-4 py-3 flex items-center justify-between" style="min-height: 56px">
                     <div class="flex items-center gap-2.5">
-                        <img src="/web-app-manifest-192x192.png" alt="MakeMyClick" class="w-10 h-10 rounded-lg">
+                        <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-lg">
                         <div>
-                            <h1 class="font-extrabold text-base leading-tight">MakeMyClick</h1>
-                            <p class="text-[10px] text-indigo-200 mt-0.5 font-medium">
-                                ${newOrders.length > 0 ? `<span class="text-red-300 font-bold">${newOrders.length} new</span> · ` : ''}${activeOrders.length} active
-                            </p>
+                            <h1 class="font-extrabold text-base leading-tight">BMH Dispatch</h1>
+                            <p class="text-[10px] text-indigo-200 mt-0.5 font-medium">${activeOrders.length} active</p>
                         </div>
                     </div>
                     <button onclick="renderMobileOrders(document.getElementById('main-content'))"
@@ -1835,33 +1520,26 @@ async function renderMobileOrders(container) {
 
             <!-- Orders List -->
             <div id="mobile-orders-list" class="px-3 pt-3 space-y-2.5">
-                ${myOrders.length === 0 ? `
+                ${activeOrders.length === 0 ? `
                     <div class="text-center py-16 px-6">
                         <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
                             <i data-lucide="check-circle-2" class="w-9 h-9 text-emerald-400"></i>
                         </div>
                         <p class="font-bold text-gray-700 text-lg">All caught up!</p>
-                        <p class="text-sm text-gray-400 mt-1.5">No orders assigned to you</p>
-                        <button onclick="switchMobileTab('all')" class="mt-4 text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-2.5 rounded-full active:bg-indigo-100">
-                            View all orders
-                        </button>
+                        <p class="text-sm text-gray-400 mt-1.5">No active orders</p>
                     </div>
-                ` : myOrders.map(o => renderMobileOrderCard(o)).join('')}
+                ` : activeOrders.map(o => renderMobileOrderCard(o)).join('')}
             </div>
         </div>`;
 
-    // Phase 1.1: Bottom nav injected directly onto <body> so position:fixed
-    // is relative to the viewport — not broken by #main-content's CSS animation.
+    // Bottom nav injected directly onto <body> so position:fixed is relative
+    // to the viewport, not broken by #main-content's CSS animation.
     document.getElementById('mobile-bottom-nav')?.remove();
     const navEl = document.createElement('nav');
     navEl.className = 'mobile-bottom-nav';
     navEl.id = 'mobile-bottom-nav';
     navEl.innerHTML = `
-        <button class="mob-nav-tab active" data-mob-tab="mine" onclick="switchMobileTab('mine')">
-            <i data-lucide="user" class="w-[22px] h-[22px]"></i>
-            <span>Mine</span>
-        </button>
-        <button class="mob-nav-tab" data-mob-tab="all" onclick="switchMobileTab('all')">
+        <button class="mob-nav-tab active" data-mob-tab="all" onclick="switchMobileTab('all')">
             <i data-lucide="list" class="w-[22px] h-[22px]"></i>
             <span>All</span>
         </button>
@@ -1870,11 +1548,6 @@ async function renderMobileOrders(container) {
                 <i data-lucide="plus" class="w-6 h-6 text-white"></i>
             </div>
             <span class="mob-nav-center-label">New</span>
-        </button>
-        <button class="mob-nav-tab" data-mob-tab="new-orders" onclick="switchMobileTab('new-orders')">
-            <i data-lucide="bell" class="w-[22px] h-[22px]"></i>
-            <span>Inbox</span>
-            ${newOrders.length > 0 ? `<span class="mob-nav-badge">${newOrders.length > 9 ? '9+' : newOrders.length}</span>` : ''}
         </button>
         <button class="mob-nav-tab" onclick="showMobileMoreSheet()">
             <i data-lucide="more-horizontal" class="w-[22px] h-[22px]"></i>
@@ -1887,15 +1560,16 @@ async function renderMobileOrders(container) {
 }
 
 function renderMobileOrderCard(o) {
-    const stageNum = parseInt((o.current_step || '').match(/STEP(\d)/)?.[1] || '0');
     const stageName = o.current_step ? stepName(o.current_step) : 'Dispatched';
-    const dateStr = o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN', {day:'2-digit', month:'short'}) : '—';
+    const dateStr = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', {day:'2-digit', month:'short'}) : '—';
 
-    // Stage progress dots — steps 2-7 (6 dots total)
-    const stageDots = [2,3,4,5,6,7].map(n => {
+    // Stage progress dots — 6 submittable steps
+    const stageDots = stepsDirectory.map(code => {
         let cls = 'stage-dot';
-        if (o.is_completed || n < stageNum) cls += ' done';
-        else if (n === stageNum) cls += ' current';
+        const idx = stepsDirectory.indexOf(code);
+        const curIdx = stepsDirectory.indexOf(o.current_step);
+        if (o.is_completed || (curIdx !== -1 && idx < curIdx)) cls += ' done';
+        else if (code === o.current_step) cls += ' current';
         return `<span class="${cls}"></span>`;
     }).join('');
 
@@ -1905,16 +1579,14 @@ function renderMobileOrderCard(o) {
             <div class="flex items-center gap-1.5 mb-2.5 flex-wrap">
                 <span class="font-mono text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">${o.order_code}</span>
                 ${o.is_delayed ? '<span class="text-[10px] font-extrabold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">⚠ DELAYED</span>' : ''}
-                ${o.type_of_order ? `<span class="text-[10px] font-semibold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md">${o.type_of_order}</span>` : ''}
             </div>
-            <!-- Customer + value -->
+            <!-- Customer -->
             <div class="flex items-start justify-between gap-3 mb-3">
                 <div class="flex-1 min-w-0">
                     <h3 class="font-extrabold text-gray-900 leading-snug" style="font-size:17px">${escapeHtml(o.customer_name)}</h3>
                     ${o.customer_phone ? `<p class="text-sm text-gray-400 mt-0.5 font-medium">${o.customer_phone}</p>` : ''}
                 </div>
                 <div class="text-right flex-shrink-0">
-                    <div class="font-extrabold font-mono text-gray-900 leading-tight" style="font-size:18px">₹${formatINR(o.order_value)}</div>
                     <div class="text-xs text-gray-400 mt-1">${dateStr}</div>
                 </div>
             </div>
@@ -1931,92 +1603,6 @@ function renderMobileOrderCard(o) {
         </div>`;
 }
 
-function renderNewOrderCard(o) {
-    const dateStr = o.created_at ? formatRelativeTime(o.created_at) : '';
-
-    return `
-        <div class="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-2xl p-4 shadow-md animate-pulse-slow" data-order-id="${o.id}">
-            <div class="flex items-start justify-between gap-3 mb-3">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span class="text-xs font-extrabold text-white bg-red-600 px-2 py-1 rounded-md">🔴 NEW ORDER</span>
-                        <span class="font-mono text-xs font-extrabold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md">${o.order_code}</span>
-                    </div>
-                    <h3 class="font-extrabold text-gray-900 text-base leading-tight mt-1">${escapeHtml(o.customer_name)}</h3>
-                    ${o.customer_phone ? `<p class="text-sm text-gray-600 mt-0.5">📱 ${o.customer_phone}</p>` : ''}
-                </div>
-                <div class="text-right flex-shrink-0">
-                    <div class="font-extrabold text-base font-mono text-gray-900">₹${formatINR(o.order_value)}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">${dateStr}</div>
-                </div>
-            </div>
-
-            <div class="text-xs text-gray-600 mb-3 bg-white/50 p-2 rounded-lg">
-                <span class="font-bold">Sales:</span> ${o.sales_person_name || '—'} ·
-                <span class="font-bold">Type:</span> ${o.type_of_order} ·
-                <span class="font-bold">Dispatch:</span> ${o.dispatch_mode}
-            </div>
-
-            <div class="flex gap-2">
-                <button onclick="acceptNewOrder('${o.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-extrabold py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-md">
-                    <i data-lucide="check-circle" class="w-4 h-4"></i> ACCEPT ORDER
-                </button>
-                <button onclick="openOrderDrawer('${o.id}')" class="bg-white border-2 border-gray-300 text-gray-700 text-sm font-bold py-3 px-4 rounded-xl">
-                    <i data-lucide="eye" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>`;
-}
-
-window.acceptNewOrder = async function(orderId) {
-    try {
-        const result = await window.db.acceptOrder(orderId, currentUser.id);
-        if (result?.success) {
-            showToast(`✅ Order ${result.order_code} accepted!`, 'success');
-            // Refresh mobile view
-            await renderMobileOrders(document.getElementById('main-content'));
-        }
-    } catch (err) {
-        showToast(err.message, 'error');
-    }
-};
-
-function setupMobileFilters(myOrders, newOrders, activeOrders) {
-    document.querySelectorAll('.mob-filter').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.mob-filter').forEach(b => {
-                b.classList.remove('active', 'bg-indigo-600', 'text-white');
-                if (b.dataset.filter === 'new') {
-                    b.classList.add('bg-red-100', 'text-red-700');
-                } else {
-                    b.classList.add('bg-gray-100', 'text-gray-700');
-                }
-            });
-            btn.classList.add('active', 'bg-indigo-600', 'text-white');
-            btn.classList.remove('bg-gray-100', 'text-gray-700', 'bg-red-100', 'text-red-700');
-
-            const filter = btn.dataset.filter;
-            let filtered = myOrders;
-            if (filter === 'new') filtered = newOrders;
-            else if (filter === 'all') filtered = activeOrders;
-            else if (filter === 'delayed') filtered = activeOrders.filter(o => o.is_delayed);
-
-            const list = document.getElementById('mobile-orders-list');
-            if (filtered.length === 0) {
-                const msg = filter === 'new'
-                    ? 'No new orders waiting'
-                    : filter === 'mine'
-                    ? "You haven't accepted any orders yet"
-                    : 'No orders';
-                list.innerHTML = `<div class="text-center py-12 text-gray-400">${msg}</div>`;
-            } else {
-                list.innerHTML = filtered.map(o => filter === 'new' ? renderNewOrderCard(o) : renderMobileOrderCard(o)).join('');
-            }
-            lucide.createIcons();
-        };
-    });
-}
-
 window.exitMobileView = function() {
     document.getElementById('mobile-bottom-nav')?.remove();
     document.body.classList.remove('mobile-view');
@@ -2024,30 +1610,18 @@ window.exitMobileView = function() {
     location.reload();
 };
 
-// Phase 1.1: Bottom nav tab switching
+// Bottom nav tab switching
 window.switchMobileTab = function(tab) {
-    // Update active tab highlight
     document.querySelectorAll('.mob-nav-tab[data-mob-tab]').forEach(t => {
         t.classList.toggle('active', t.dataset.mobTab === tab);
     });
 
-    const { myOrders, newOrders, activeOrders } = window.__mobileOrderData || {};
+    const { activeOrders } = window.__mobileOrderData || {};
     const list = document.getElementById('mobile-orders-list');
     if (!list || !activeOrders) return;
 
-    let filtered, useNewCard = false;
-    if (tab === 'mine')       filtered = myOrders;
-    else if (tab === 'all')   filtered = activeOrders;
-    else if (tab === 'new-orders') { filtered = newOrders; useNewCard = true; }
-    else if (tab === 'delayed')   filtered = activeOrders.filter(o => o.is_delayed);
-    else filtered = myOrders;
-
-    const emptyMessages = {
-        mine:       "No orders assigned to you",
-        all:        "No active orders",
-        'new-orders': "No new orders waiting",
-        delayed:    "No delayed orders — all on time!"
-    };
+    const filtered = tab === 'delayed' ? activeOrders.filter(o => o.is_delayed) : activeOrders;
+    const emptyMessages = { all: 'No active orders', delayed: 'No delayed orders — all on time!' };
 
     if (!filtered || filtered.length === 0) {
         list.innerHTML = `
@@ -2058,7 +1632,7 @@ window.switchMobileTab = function(tab) {
                 <p class="font-bold text-gray-500 text-base">${emptyMessages[tab] || 'No orders'}</p>
             </div>`;
     } else {
-        list.innerHTML = filtered.map(o => useNewCard ? renderNewOrderCard(o) : renderMobileOrderCard(o)).join('');
+        list.innerHTML = filtered.map(o => renderMobileOrderCard(o)).join('');
     }
     lucide.createIcons();
 };
@@ -2116,7 +1690,7 @@ window.showMobileMoreSheet = function() {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-bold text-red-600">Log Out</div>
-                        <div class="text-xs text-gray-400 mt-0.5">Sign out of MMC Dispatch</div>
+                        <div class="text-xs text-gray-400 mt-0.5">Sign out of BMH Dispatch</div>
                     </div>
                 </button>
             </div>
@@ -2214,7 +1788,7 @@ document.addEventListener('keydown', (e) => {
 // ==========================================
 window.generateShareLink = async function(orderId, orderCode, customerPhone) {
     try {
-        const token = await window.db.createShareToken(orderId);
+        const token = await window.db.createShareToken(orderId, currentOrgId);
         const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
         const shareUrl = `${baseUrl}track.html?t=${token}`;
         showShareDialog(orderCode, shareUrl, customerPhone);
@@ -2968,281 +2542,6 @@ window.closeFilePreview = function() {
 
 // ==========================================
 // ==========================================
-// 📥 PENDING ORDERS QUEUE
-// ==========================================
-async function renderPendingQueue(container) {
-    container.innerHTML = renderLoadingState();
-
-    const pending = await window.db.getPendingOrders();
-    window.__pendingOrders = pending;
-
-    if (pending.length === 0) {
-        container.innerHTML = `
-            <div class="max-w-7xl mx-auto animate-in">
-                <h1 class="text-2xl font-extrabold tracking-tight mb-1">📥 Pending Approval Queue</h1>
-                <p class="text-sm text-gray-500 mb-6">Orders from email awaiting review</p>
-                <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                    <i data-lucide="inbox" class="w-16 h-16 mx-auto text-gray-300 mb-3"></i>
-                    <p class="font-semibold text-gray-500">Inbox zero! No pending orders</p>
-                    <p class="text-xs text-gray-400 mt-1">Email automation will queue new orders here</p>
-                </div>
-            </div>`;
-        lucide.createIcons();
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="max-w-7xl mx-auto animate-in">
-            <div class="flex items-center justify-between mb-5">
-                <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight">📥 Pending Approval Queue</h1>
-                    <p class="text-sm text-gray-500 mt-1">${pending.length} order${pending.length>1?'s':''} from email awaiting review</p>
-                </div>
-                <button onclick="renderPendingQueue(document.getElementById('main-content'))" class="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg flex items-center gap-1.5">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Refresh
-                </button>
-            </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="pending-grid">
-                ${pending.map(p => renderPendingCard(p)).join('')}
-            </div>
-        </div>`;
-    lucide.createIcons();
-
-    // Start countdown timers for HIGH confidence orders
-    startAutoSubmitTimers();
-}
-
-function renderPendingCard(p) {
-    const confColors = {
-        'HIGH':   { bg:'bg-emerald-50', border:'border-emerald-300', text:'text-emerald-700', icon:'✅' },
-        'MEDIUM': { bg:'bg-amber-50',   border:'border-amber-300',   text:'text-amber-700',   icon:'⚠️' },
-        'LOW':    { bg:'bg-red-50',     border:'border-red-300',     text:'text-red-700',     icon:'🔴' }
-    };
-    const c = confColors[p.gemini_confidence] || confColors.MEDIUM;
-    const secondsLeft = Math.max(0, Math.floor((new Date(p.auto_submit_at) - new Date()) / 1000));
-    const willAutoSubmit = p.gemini_confidence === 'HIGH' && secondsLeft > 0;
-
-    return `
-        <div class="bg-white border-2 ${c.border} rounded-xl p-4 shadow-sm" data-pending-id="${p.id}" data-auto-submit="${p.gemini_confidence === 'HIGH' ? 'true' : 'false'}">
-            <div class="flex justify-between items-start mb-3">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-xs font-bold ${c.text} ${c.bg} px-2 py-0.5 rounded">${c.icon} ${p.gemini_confidence}</span>
-                        <span class="text-[10px] font-bold text-gray-500 uppercase">${formatRelativeTime(p.received_at)}</span>
-                    </div>
-                    <h3 class="font-extrabold text-gray-900 truncate">${escapeHtml(p.customer_name || 'UNKNOWN')}</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">From: ${escapeHtml(p.sales_person || '?')} · ${escapeHtml(p.source_email || '')}</p>
-                </div>
-                <button onclick="previewFile('${p.pdf_url}', 'Challan')" class="text-xs text-indigo-600 hover:underline flex items-center gap-1 flex-shrink-0">
-                    <i data-lucide="paperclip" class="w-3 h-3"></i> PDF
-                </button>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 mb-3 text-sm">
-                <div class="bg-gray-50 rounded p-2">
-                    <div class="text-[10px] font-bold text-gray-400 uppercase">Value</div>
-                    <div class="font-bold font-mono">₹${formatINR(p.order_value)}</div>
-                </div>
-                <div class="bg-gray-50 rounded p-2">
-                    <div class="text-[10px] font-bold text-gray-400 uppercase">Phone</div>
-                    <div class="font-bold">${p.customer_phone || '—'}</div>
-                </div>
-                <div class="bg-gray-50 rounded p-2">
-                    <div class="text-[10px] font-bold text-gray-400 uppercase">Type</div>
-                    <div class="font-bold text-xs">${p.type_of_order}</div>
-                </div>
-                <div class="bg-gray-50 rounded p-2">
-                    <div class="text-[10px] font-bold text-gray-400 uppercase">Dispatch</div>
-                    <div class="font-bold text-xs">${p.dispatch_mode}</div>
-                </div>
-            </div>
-
-            ${willAutoSubmit ? `
-                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2 mb-3 flex items-center gap-2">
-                    <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600 animate-pulse"></i>
-                    <span class="text-xs font-bold text-emerald-700">Auto-submitting in <span class="countdown" data-id="${p.id}">${secondsLeft}</span>s</span>
-                </div>
-            ` : p.gemini_confidence === 'LOW' ? `
-                <div class="bg-red-50 border border-red-200 rounded-lg p-2 mb-3 text-xs text-red-700">
-                    ⚠️ Low confidence — manual review required
-                </div>
-            ` : ''}
-
-            <div class="flex gap-2">
-                <button onclick="approvePending('${p.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-md flex items-center justify-center gap-1.5">
-                    <i data-lucide="check" class="w-3.5 h-3.5"></i> Approve Now
-                </button>
-                <button onclick="editPending('${p.id}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-md flex items-center gap-1.5">
-                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
-                </button>
-                <button onclick="rejectPending('${p.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-3 py-2 rounded-md flex items-center gap-1.5">
-                    <i data-lucide="x" class="w-3.5 h-3.5"></i> Reject
-                </button>
-            </div>
-        </div>`;
-}
-
-// Countdown for HIGH confidence auto-submission
-window.__pendingTimers = {};
-function startAutoSubmitTimers() {
-    // Clear existing
-    Object.values(window.__pendingTimers).forEach(t => clearInterval(t));
-    window.__pendingTimers = {};
-
-    document.querySelectorAll('[data-auto-submit="true"]').forEach(card => {
-        const id = card.dataset.pendingId;
-        const countdownEl = card.querySelector('.countdown');
-        if (!countdownEl) return;
-
-        window.__pendingTimers[id] = setInterval(() => {
-            let secs = parseInt(countdownEl.textContent);
-            if (secs <= 0) {
-                clearInterval(window.__pendingTimers[id]);
-                approvePending(id, true);
-                return;
-            }
-            countdownEl.textContent = secs - 1;
-        }, 1000);
-    });
-}
-
-window.approvePending = async function(pendingId, isAuto) {
-    try {
-        if (window.__pendingTimers[pendingId]) {
-            clearInterval(window.__pendingTimers[pendingId]);
-            delete window.__pendingTimers[pendingId];
-        }
-        const result = await window.db.approvePendingOrder(pendingId);
-        showToast(`${isAuto ? '🤖 Auto-' : '✅ '}Approved! Created ${result.orderCode}`, 'success');
-        renderPendingQueue(document.getElementById('main-content'));
-    } catch (err) {
-        showToast(err.message, 'error');
-    }
-};
-
-window.rejectPending = async function(pendingId) {
-    const reason = prompt('Reason for rejection (optional):');
-    if (reason === null) return;
-    try {
-        if (window.__pendingTimers[pendingId]) clearInterval(window.__pendingTimers[pendingId]);
-        await window.db.rejectPendingOrder(pendingId, reason);
-        showToast('Order rejected', 'info');
-        renderPendingQueue(document.getElementById('main-content'));
-    } catch (err) {
-        showToast(err.message, 'error');
-    }
-};
-
-window.editPending = function(pendingId) {
-    const p = (window.__pendingOrders || []).find(x => x.id === pendingId);
-    if (!p) return;
-
-    // Stop auto-submit while editing
-    if (window.__pendingTimers[pendingId]) {
-        clearInterval(window.__pendingTimers[pendingId]);
-        delete window.__pendingTimers[pendingId];
-    }
-
-    const html = `
-        <div id="edit-pending-modal" class="fixed inset-0 z-[70] flex items-center justify-center modal-backdrop p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-                <div class="p-5 border-b border-gray-100 bg-indigo-50 flex justify-between items-center">
-                    <div>
-                        <h3 class="font-black text-lg">Edit Order Details</h3>
-                        <p class="text-xs text-gray-600">Fix any wrong data before approving</p>
-                    </div>
-                    <button onclick="document.getElementById('edit-pending-modal').remove()" class="text-gray-400 hover:text-gray-900 bg-white rounded-full p-1.5">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-                <form onsubmit="savePendingEdit(event, '${pendingId}')" class="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Customer Name</label>
-                        <input id="pe-name" value="${escapeHtml(p.customer_name || '')}" required class="w-full border rounded-lg p-2 text-sm">
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Phone</label>
-                            <input id="pe-phone" value="${p.customer_phone || ''}" class="w-full border rounded-lg p-2 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Order Value ₹</label>
-                            <input id="pe-value" type="number" step="0.01" value="${p.order_value || 0}" class="w-full border rounded-lg p-2 text-sm">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Type</label>
-                            <select id="pe-type" class="w-full border rounded-lg p-2 text-sm">
-                                <option value="BLANK" ${p.type_of_order==='BLANK'?'selected':''}>BLANK</option>
-                                <option value="PRINTED" ${p.type_of_order==='PRINTED'?'selected':''}>PRINTED</option>
-                                <option value="BLANK AND PRINTED" ${p.type_of_order==='BLANK AND PRINTED'?'selected':''}>BLANK AND PRINTED</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Dispatch</label>
-                            <select id="pe-dispatch" class="w-full border rounded-lg p-2 text-sm">
-                                ${['PORTER','SELF','DTDC','DELIVERY','CARGO','BUS','TRACKON','OTHER'].map(m =>
-                                    `<option value="${m}" ${p.dispatch_mode===m?'selected':''}>${m}</option>`).join('')}
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Sales Person</label>
-                        <input id="pe-sales" value="${escapeHtml(p.sales_person || '')}" class="w-full border rounded-lg p-2 text-sm">
-                    </div>
-                    <div class="flex justify-end gap-2 pt-3 border-t">
-                        <button type="button" onclick="document.getElementById('edit-pending-modal').remove()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                        <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow flex items-center gap-1.5">
-                            <i data-lucide="check" class="w-4 h-4"></i> Save & Approve
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
-    lucide.createIcons();
-};
-
-window.savePendingEdit = async function(e, pendingId) {
-    e.preventDefault();
-    try {
-        await window.db.updatePendingOrder(pendingId, {
-            customer_name: document.getElementById('pe-name').value.trim(),
-            customer_phone: document.getElementById('pe-phone').value.trim() || null,
-            order_value: parseFloat(document.getElementById('pe-value').value) || 0,
-            type_of_order: document.getElementById('pe-type').value,
-            dispatch_mode: document.getElementById('pe-dispatch').value,
-            sales_person: document.getElementById('pe-sales').value.trim()
-        });
-        document.getElementById('edit-pending-modal').remove();
-        await window.db.approvePendingOrder(pendingId);
-        showToast('✅ Order approved & created!', 'success');
-        renderPendingQueue(document.getElementById('main-content'));
-    } catch (err) {
-        showToast(err.message, 'error');
-    }
-};
-
-async function updatePendingBadge() {
-    try {
-        const { count } = await window.db.supabase
-            .from('pending_orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'PENDING');
-        const badge = document.getElementById('pending-badge');
-        if (badge) {
-            if (count > 0) {
-                badge.textContent = count;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-    } catch (e) { console.error(e); }
-}
-
-// ==========================================
 // 📈 BUSINESS INTELLIGENCE ANALYTICS PAGE
 // ==========================================
 async function renderAnalytics(container) {
@@ -3439,8 +2738,8 @@ window.parseChallanWithAI = async function(file) {
         }]
     };
 
-    // Calls the Netlify function
-    const res = await fetch('/.netlify/functions/gemini-proxy', {
+    // Calls the Vercel serverless function (api/gemini-proxy.js)
+    const res = await fetch('/api/gemini-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

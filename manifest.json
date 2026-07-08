@@ -1,7 +1,7 @@
 {
-  "name": "MakeMyClick Dispatch",
-  "short_name": "MakeMyClick",
-  "description": "MakeMyClick Dispatch Management System",
+  "name": "BMH Dispatch",
+  "short_name": "BMH Dispatch",
+  "description": "Bansal Metrial House Dispatch Management System",
   "start_url": "/#/mobile/orders",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -21,7 +21,10 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "shortcuts": [
     {
       "name": "Orders",
