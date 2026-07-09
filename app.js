@@ -87,12 +87,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             setupRealtime();
             
             // 📱 Auto-detect mobile — MULTIPLE checks
+            const forcedDesktop = localStorage.getItem('bmh_force_desktop') === '1';
             const isMobileUA = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isMobileWidth = window.innerWidth < 768;
             const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             const isPWA = window.matchMedia('(display-mode: standalone)').matches;
 
-            const isMobile = isMobileUA || isMobileWidth || isPWA || (isTouchDevice && window.innerWidth < 1024);
+            // A user who explicitly picked "Desktop View" stays on desktop even
+            // inside an installed PWA window — isPWA alone used to force mobile
+            // mode unconditionally, which fought the user's own choice on every reload.
+            const isMobile = !forcedDesktop && (isMobileUA || isMobileWidth || isPWA || (isTouchDevice && window.innerWidth < 1024));
 
             if (isMobile && !location.hash.startsWith('#/mobile') && location.hash !== '#/login') {
                 console.log('📱 Mobile detected, redirecting...');
@@ -1640,6 +1644,7 @@ function renderMobileOrderCard(o) {
 }
 
 window.exitMobileView = function() {
+    localStorage.setItem('bmh_force_desktop', '1');
     document.getElementById('mobile-bottom-nav')?.remove();
     document.body.classList.remove('mobile-view');
     location.hash = '#/dashboard';
