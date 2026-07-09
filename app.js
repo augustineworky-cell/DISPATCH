@@ -179,6 +179,7 @@ async function router() {
 
     if (hash === '#/login') {
         app.innerHTML = renderLoginUI();
+        lucide.createIcons();
     } else {
         app.innerHTML = `
             ${renderSidebar()}
