@@ -1230,6 +1230,16 @@ function renderDrawerStep(step, order, latestSub) {
             💳 ${pt}${bank ? ' · ' + bank : ''}
         </div>`;
     }
+    if (isDone && latestSub?.form_data?.num_cartons !== undefined) {
+        const d = latestSub.form_data;
+        dataPreview += `<div class="ml-12 mt-2 flex flex-wrap gap-1.5">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">⚖️ ${d.weight_kg}kg</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">📦 ${d.num_cartons} cartons</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded ${d.quality_check ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}">${d.quality_check ? '✓' : '✗'} Quality</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded ${d.labelling_check ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}">${d.labelling_check ? '✓' : '✗'} Labelling</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded ${d.private_marka_check ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}">${d.private_marka_check ? '✓' : '✗'} Private Marka</span>
+        </div>`;
+    }
     if (isDone && latestSub?.form_data?.notes) {
         dataPreview += `<div class="ml-12 mt-2 text-[11px] text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300 italic">
             📝 ${escapeHtml(latestSub.form_data.notes)}
@@ -1350,13 +1360,47 @@ window.openStepModal = function(orderId, stepCode) {
         </select>
     ` : '';
 
+    // Same structured checklist as the mobile Packing Queue's accept flow —
+    // so completing this step gives the same result whether it's done via
+    // the normal drawer's "Upload Evidence" button or via Packing Queue.
+    const packingFields = stepCode === 'STEP5_PACKING_DONE' ? `
+        <div class="grid grid-cols-2 gap-2.5 mb-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Weight (kg)</label>
+                <input type="number" step="0.01" id="form-weight" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">No. of Cartons</label>
+                <input type="number" id="form-cartons" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-3 mb-3">
+            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-quality"> Quality check</label>
+            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-label"> Labelling correct</label>
+            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-marka"> Private marka</label>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5 mb-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Photo before packing</label>
+                <input type="file" id="form-photo-before" accept="image/*" required class="w-full text-xs">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Photo after packing</label>
+                <input type="file" id="form-photo-after" accept="image/*" required class="w-full text-xs">
+            </div>
+        </div>
+    ` : '';
+
     const fields = `
         <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 text-xs text-indigo-900 leading-relaxed">
             💡 ${stepHint(stepCode)}
         </div>
         ${paymentFields}
+        ${packingFields}
+        ${stepCode !== 'STEP5_PACKING_DONE' ? `
         <label class="block text-sm font-semibold text-gray-700 mb-1">Proof File *</label>
         <input type="file" id="form-file" accept="image/*,.pdf" required class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-3">
+        ` : ''}
         <label class="block text-sm font-semibold text-gray-700 mb-1">Notes (optional)</label>
         <textarea id="form-notes" placeholder="Any notes for this step..." class="w-full border rounded-lg p-2 text-sm h-20"></textarea>`;
 
@@ -1412,6 +1456,18 @@ window.submitStepForm = async function(e, orderId, stepCode, bucket) {
             if (paymentTypeEl.value === 'BANK') {
                 formData.bank_name_confirmed = document.getElementById('form-bank-name')?.value || null;
             }
+        }
+
+        if (stepCode === 'STEP5_PACKING_DONE') {
+            formData.weight_kg = parseFloat(document.getElementById('form-weight').value);
+            formData.num_cartons = parseInt(document.getElementById('form-cartons').value, 10);
+            formData.quality_check = document.getElementById('form-quality').checked;
+            formData.labelling_check = document.getElementById('form-label').checked;
+            formData.private_marka_check = document.getElementById('form-marka').checked;
+            const beforeFile = document.getElementById('form-photo-before').files[0];
+            const afterFile = document.getElementById('form-photo-after').files[0];
+            if (beforeFile) formData.photo_before_url = await window.db.uploadFile(bucket, beforeFile);
+            if (afterFile) formData.photo_after_url = await window.db.uploadFile(bucket, afterFile);
         }
 
         const fileInput = document.getElementById('form-file');
@@ -1677,7 +1733,7 @@ async function renderMobileOrders(container) {
                     </div>
 
                     <!-- Search bar, rounded pill (Zepto-style) -->
-                    <button onclick="document.getElementById('mobile-search-trigger')?.click()" class="w-full bg-white rounded-2xl px-4 py-3 flex items-center gap-2.5 shadow-md">
+                    <button onclick="openMobileSearch()" class="w-full bg-white rounded-2xl px-4 py-3 flex items-center gap-2.5 shadow-md">
                         <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
                         <span class="text-sm text-gray-400 font-medium">Search orders, customers...</span>
                     </button>
@@ -1813,6 +1869,77 @@ function renderMobileOrderCard(o) {
             </div>
         </div>`;
 }
+
+// ==========================================
+// MOBILE SEARCH — full-screen overlay, debounced live search
+// ==========================================
+let __mobileSearchTimer = null;
+
+window.openMobileSearch = function() {
+    document.getElementById('mobile-search-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'mobile-search-overlay';
+    overlay.className = 'fixed inset-0 z-[95] bg-white flex flex-col';
+    overlay.innerHTML = `
+        <div class="flex items-center gap-2 p-3 border-b border-gray-100" style="padding-top: calc(12px + env(safe-area-inset-top, 0px))">
+            <button onclick="closeMobileSearch()" class="p-2 -ml-1"><i data-lucide="arrow-left" class="w-5 h-5 text-gray-600"></i></button>
+            <div class="flex-1 bg-gray-100 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+                <input id="mobile-search-input" type="text" placeholder="Search orders, customers..."
+                    class="flex-1 bg-transparent outline-none text-sm" oninput="handleMobileSearchInput(this.value)">
+            </div>
+        </div>
+        <div id="mobile-search-results" class="flex-1 overflow-y-auto px-3 py-3">
+            <p class="text-center text-gray-400 text-sm mt-10">Start typing to search</p>
+        </div>`;
+    document.body.appendChild(overlay);
+    lucide.createIcons();
+    document.getElementById('mobile-search-input').focus();
+};
+
+window.closeMobileSearch = function() {
+    document.getElementById('mobile-search-overlay')?.remove();
+};
+
+window.handleMobileSearchInput = function(query) {
+    clearTimeout(__mobileSearchTimer);
+    const resultsEl = document.getElementById('mobile-search-results');
+    if (!query.trim()) {
+        resultsEl.innerHTML = `<p class="text-center text-gray-400 text-sm mt-10">Start typing to search</p>`;
+        return;
+    }
+    resultsEl.innerHTML = `<p class="text-center text-gray-400 text-sm mt-10">Searching...</p>`;
+    __mobileSearchTimer = setTimeout(async () => {
+        try {
+            const { orders, customers } = await window.db.globalSearch(query);
+            if (!orders.length && !customers.length) {
+                resultsEl.innerHTML = `<p class="text-center text-gray-400 text-sm mt-10">No results for "${escapeHtml(query)}"</p>`;
+                return;
+            }
+            let html = '';
+            if (orders.length) {
+                html += `<p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2 px-1">Orders</p>`;
+                html += orders.map(o => renderMobileOrderCard(o)).join('<div class="h-2.5"></div>');
+            }
+            if (customers.length) {
+                html += `<p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mt-4 mb-2 px-1">Customers</p>`;
+                html += customers.map(c => `
+                    <div onclick="closeMobileSearch(); openCustomerDrawer('${c.id}')" class="bg-white rounded-2xl shadow-sm p-3.5 flex items-center gap-3 mb-2">
+                        <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center font-extrabold text-purple-600 text-sm">${(c.name || '?').substring(0,2).toUpperCase()}</div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold text-gray-900 text-sm truncate">${escapeHtml(c.name)}</p>
+                            <p class="text-xs text-gray-400">${c.phone || ''}</p>
+                        </div>
+                    </div>`).join('');
+            }
+            resultsEl.innerHTML = html;
+            lucide.createIcons();
+        } catch (err) {
+            resultsEl.innerHTML = `<p class="text-center text-red-500 text-sm mt-10">Search failed: ${escapeHtml(err.message)}</p>`;
+        }
+    }, 350);
+};
 
 window.exitMobileView = function() {
     localStorage.setItem('bmh_force_desktop', '1');
