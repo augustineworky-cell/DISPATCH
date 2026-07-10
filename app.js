@@ -849,7 +849,13 @@ async function renderNewOrder(container) {
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">City</label>
-                            <input type="text" id="no_city" placeholder="e.g. Delhi" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <select id="no_city" onchange="handleCityChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="" disabled selected>Select city...</option>
+                                ${['Delhi','Gurgaon','Noida','Ghaziabad','Faridabad','Mumbai','Bangalore','Chennai','Kolkata','Hyderabad','Pune','Ahmedabad','Jaipur','Lucknow','Chandigarh']
+                                    .map(c => `<option value="${c}">${c}</option>`).join('')}
+                                <option value="__OTHER__">+ Other (type city)</option>
+                            </select>
+                            <input type="text" id="no_city_custom" placeholder="Enter city name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">State</label>
@@ -1182,8 +1188,15 @@ function renderDrawerStep(step, order, latestSub) {
     // preview is just the notes text if any was entered — no per-step
     // custom fields like MMC's lead_time/PDI-checklist/charges_amount/tracking_id.
     let dataPreview = '';
+    if (isDone && latestSub?.form_data?.payment_type_confirmed) {
+        const pt = latestSub.form_data.payment_type_confirmed;
+        const bank = latestSub.form_data.bank_name_confirmed;
+        dataPreview += `<div class="ml-12 mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded font-semibold">
+            💳 ${pt}${bank ? ' · ' + bank : ''}
+        </div>`;
+    }
     if (isDone && latestSub?.form_data?.notes) {
-        dataPreview = `<div class="ml-12 mt-2 text-[11px] text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300 italic">
+        dataPreview += `<div class="ml-12 mt-2 text-[11px] text-gray-700 bg-gray-50 p-2 rounded border-l-2 border-gray-300 italic">
             📝 ${escapeHtml(latestSub.form_data.notes)}
         </div>`;
     }
@@ -1283,10 +1296,30 @@ window.openStepModal = function(orderId, stepCode) {
     const cfg = stepLabels[stepCode] || {};
     const bucket = 'bmh-proofs';   // single bucket for every step, per schema.sql
 
+    // Payment method fields only make sense on the payment confirmation step —
+    // lets the accountant record the ACTUAL method/bank used, separate from
+    // whatever was guessed at order creation time.
+    const paymentFields = stepCode === 'STEP3_PAYMENT_CONFIRMED' ? `
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Payment Method Confirmed</label>
+        <select id="form-payment-type" onchange="handleStepPaymentTypeChange(this)" class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-1">
+            <option value="" disabled selected>Select method...</option>
+            <option value="CASH">CASH</option>
+            <option value="UPI">UPI</option>
+            <option value="BANK">BANK</option>
+        </select>
+        <select id="form-bank-name" style="display:none;" class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-3">
+            <option value="" disabled selected>Select bank...</option>
+            <option value="KOTAK">KOTAK</option>
+            <option value="PNB">PNB</option>
+            <option value="HDFC">HDFC</option>
+        </select>
+    ` : '';
+
     const fields = `
         <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 text-xs text-indigo-900 leading-relaxed">
             💡 ${stepHint(stepCode)}
         </div>
+        ${paymentFields}
         <label class="block text-sm font-semibold text-gray-700 mb-1">Proof File *</label>
         <input type="file" id="form-file" accept="image/*,.pdf" required class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-3">
         <label class="block text-sm font-semibold text-gray-700 mb-1">Notes (optional)</label>
@@ -1337,6 +1370,14 @@ window.submitStepForm = async function(e, orderId, stepCode, bucket) {
 
         const notes = document.getElementById('form-notes')?.value;
         if (notes) formData.notes = notes;
+
+        const paymentTypeEl = document.getElementById('form-payment-type');
+        if (paymentTypeEl?.value) {
+            formData.payment_type_confirmed = paymentTypeEl.value;
+            if (paymentTypeEl.value === 'BANK') {
+                formData.bank_name_confirmed = document.getElementById('form-bank-name')?.value || null;
+            }
+        }
 
         const fileInput = document.getElementById('form-file');
         if (fileInput && fileInput.files.length > 0) {
@@ -1417,6 +1458,11 @@ window.handleCreateOrder = async function(e) {
         // order_code/order_number are generated server-side by the create_order RPC
         const customerId = await window.db.upsertCustomer(currentOrgId, companyNameInput, customerPhoneInput);
 
+        const cityEl = document.getElementById('no_city');
+        const cityInput = cityEl.value === '__OTHER__'
+            ? document.getElementById('no_city_custom').value.trim()
+            : cityEl.value;
+
         const newOrder = await window.db.createOrder({
             organizationId: currentOrgId,
             customerId: customerId,
@@ -1424,7 +1470,7 @@ window.handleCreateOrder = async function(e) {
             customerPhone: customerPhoneInput,
             customerPhone2: customerPhone2Input,
             contactPerson: document.getElementById('no_contact_person').value.trim() || null,
-            city: document.getElementById('no_city').value.trim() || null,
+            city: cityInput || null,
             state: document.getElementById('no_state').value || null,
             paymentType: paymentTypeInput,
             bankName: bankNameInput,
@@ -2700,6 +2746,27 @@ async function renderAnalytics(container) {
         });
     }, 50);
 }
+window.handleStepPaymentTypeChange = function(selectEl) {
+    const bankSelect = document.getElementById('form-bank-name');
+    if (selectEl.value === 'BANK') {
+        bankSelect.style.display = 'block';
+    } else {
+        bankSelect.style.display = 'none';
+        bankSelect.value = '';
+    }
+};
+
+window.handleCityChange = function(selectEl) {
+    const customInput = document.getElementById('no_city_custom');
+    if (selectEl.value === '__OTHER__') {
+        customInput.style.display = 'block';
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+    }
+};
+
 window.handlePaymentTypeChange = function(selectEl) {
     const bankSelect = document.getElementById('no_bank_name');
     if (selectEl.value === 'BANK') {
