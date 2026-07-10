@@ -314,6 +314,23 @@ window.db = {
         return data;
     },
 
+    // Attaches an optional PI/order document as evidence on STEP1, without
+    // going through the submit_step RPC — STEP1 is already DONE at creation,
+    // and re-running submit_step would incorrectly re-anchor STEP2's
+    // planned_at off "now" instead of leaving the original cascaded seed
+    // value from create_order intact.
+    async attachStep1Evidence(orderId, fileUrl, userId) {
+        const { error } = await supabaseClient
+            .from('step_submissions')
+            .insert([{
+                order_id: orderId,
+                step_code: 'STEP1_ORDER_RECEIVED',
+                form_data: { file_url: fileUrl, submitted_by: userId, submitted_at: new Date().toISOString() },
+                is_latest: true
+            }]);
+        if (error) throw error;
+    },
+
     async createShareToken(orderId, organizationId) {
         const { data: existing } = await supabaseClient
             .from('public_share_tokens').select('token')

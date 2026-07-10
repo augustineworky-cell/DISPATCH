@@ -911,6 +911,11 @@ async function renderNewOrder(container) {
                             </select>
                             <input type="text" id="no_sales_custom" placeholder="Enter name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
+                        <div class="col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Performa Invoice / Order Document (optional)</label>
+                            <input type="file" id="no_pi_file" accept="image/*,.pdf" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
+                            <p class="text-[11px] text-gray-400 mt-1">If attached here, it will show as evidence on Step 1 (Order Received) in the drawer.</p>
+                        </div>
                     </div>
                     <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
                         <button type="button" onclick="history.back()" class="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">${t('cancel')}</button>
@@ -1491,6 +1496,13 @@ window.handleCreateOrder = async function(e) {
                 : salesEl.value,
             orderValue: null   // BMH's process doesn't track this — schema column stays nullable
         });
+
+        const piFile = document.getElementById('no_pi_file').files[0];
+        if (piFile) {
+            const piFileUrl = await window.db.uploadFile('bmh-proofs', piFile);
+            await window.db.attachStep1Evidence(newOrder.id, piFileUrl, currentUser.id);
+        }
+
         showToast('Order created!', 'success');
         location.hash = '#/orders';
         setTimeout(() => openOrderDrawer(newOrder.id), 400);
