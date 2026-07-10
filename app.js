@@ -3090,9 +3090,15 @@ async function renderPackingAssignment(container) {
                             </select>
                         </div>
                         <div class="col-span-2">
-                            <input type="number" id="priority-${o.id}" value="${o.packing_priority ?? ''}" placeholder="—"
+                            <select id="priority-${o.id}"
                                 onchange="handlePackerAssign('${o.id}', this.parentElement.parentElement.querySelector('select').value, this.value)"
-                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs" min="1">
+                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                                <option value="" ${!o.packing_priority ? 'selected' : ''}>— None —</option>
+                                <option value="1" ${o.packing_priority === 1 ? 'selected' : ''}>🔴 Urgent</option>
+                                <option value="2" ${o.packing_priority === 2 ? 'selected' : ''}>🟠 High</option>
+                                <option value="3" ${o.packing_priority === 3 ? 'selected' : ''}>🔵 Moderate</option>
+                                <option value="4" ${o.packing_priority === 4 ? 'selected' : ''}>⚪ Low</option>
+                            </select>
                         </div>
                     </div>
                 `).join('')}
@@ -3150,6 +3156,13 @@ async function renderPackingQueueMobile(container) {
     lucide.createIcons();
 }
 
+const PACKING_PRIORITY_LABELS = {
+    1: { label: 'Urgent', emoji: '🔴', classes: 'bg-red-100 text-red-700' },
+    2: { label: 'High', emoji: '🟠', classes: 'bg-orange-100 text-orange-700' },
+    3: { label: 'Moderate', emoji: '🔵', classes: 'bg-blue-100 text-blue-700' },
+    4: { label: 'Low', emoji: '⚪', classes: 'bg-gray-100 text-gray-600' }
+};
+
 function renderPackingRequestCard(o) {
     return `
         <div class="bg-white rounded-2xl shadow-md border-2 border-indigo-500 p-4 mb-3 relative overflow-hidden">
@@ -3162,7 +3175,7 @@ function renderPackingRequestCard(o) {
                         <p class="font-mono text-xs font-bold text-indigo-600">${o.order_code}</p>
                         <p class="font-extrabold text-gray-900">${escapeHtml(o.customer_name)}</p>
                     </div>
-                    ${o.packing_priority ? `<span class="text-xs font-bold px-2 py-1 rounded bg-amber-100 text-amber-700">Priority ${o.packing_priority}</span>` : ''}
+                    ${o.packing_priority && PACKING_PRIORITY_LABELS[o.packing_priority] ? `<span class="text-xs font-bold px-2 py-1 rounded ${PACKING_PRIORITY_LABELS[o.packing_priority].classes}">${PACKING_PRIORITY_LABELS[o.packing_priority].emoji} ${PACKING_PRIORITY_LABELS[o.packing_priority].label}</span>` : ''}
                 </div>
                 <p class="text-xs text-gray-400 mb-3">Assigned to: <span class="font-bold text-gray-600">${o.assigned_packer}</span></p>
                 <div class="flex gap-2">
