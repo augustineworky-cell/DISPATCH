@@ -1,5 +1,5 @@
-﻿// MMC Dispatch Service Worker
-const CACHE_NAME = 'mmc-dispatch-v2';
+﻿// BMH Dispatch Service Worker
+const CACHE_NAME = 'bmh-dispatch-v3';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
