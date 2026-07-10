@@ -12,8 +12,9 @@
 // the order directly rather than landing in an approval queue. Add these
 // back later if BMH ever needs a WhatsApp-bot-style intake queue.
 // ============================================================================
-const SUPABASE_URL = 'https://yoypuxathaxhbfbqhuwo.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlveXB1eGF0aGF4aGJmYnFodXdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTI0ODAsImV4cCI6MjA5OTA2ODQ4MH0.YRwYptquEP8TYH_CSnfCWBkKUvpr31SGicriGMaFoE4';
+const SUPABASE_URL = 'PASTE_YOUR_BMH_SUPABASE_URL_HERE';
+const SUPABASE_ANON_KEY = 'PASTE_YOUR_BMH_ANON_KEY_HERE';
+
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 window.db = {
@@ -291,17 +292,20 @@ window.db = {
     // ========================================================================
 
     async createOrder({
-        organizationId, customerId, customerName, customerPhone, contactPerson,
-        city, paymentType, dispatchMode, salesPersonName, orderValue
+        organizationId, customerId, customerName, customerPhone, customerPhone2, contactPerson,
+        city, state, paymentType, bankName, dispatchMode, salesPersonName, orderValue
     }) {
         const { data, error } = await supabaseClient.rpc('create_order', {
             p_organization_id: organizationId,
             p_customer_id: customerId || null,
             p_customer_name: customerName,
             p_customer_phone: customerPhone || null,
+            p_customer_phone_2: customerPhone2 || null,
             p_contact_person: contactPerson || null,
             p_city: city || null,
+            p_state: state || null,
             p_payment_type: paymentType,
+            p_bank_name: bankName || null,
             p_dispatch_mode: dispatchMode,
             p_sales_person_name: salesPersonName || null,
             p_order_value: orderValue ?? null

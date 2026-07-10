@@ -818,7 +818,6 @@ async function renderOrders(container) {
 // ==========================================
 async function renderNewOrder(container) {
     container.innerHTML = renderLoadingState();
-    const salesUsers = await window.db.getSalesUsers();
     container.innerHTML = `
         <div class="max-w-3xl mx-auto animate-in">
             <button onclick="history.back()" class="text-sm font-semibold text-gray-500 hover:text-gray-900 mb-6 flex items-center gap-1">
@@ -832,8 +831,8 @@ async function renderNewOrder(container) {
                 <form onsubmit="handleCreateOrder(event)" class="p-8 space-y-6">
                     <div class="grid grid-cols-2 gap-6">
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Name *</label>
-                            <input type="text" id="no_customer_name" required placeholder="Company / customer name..." autocomplete="off"
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Company Name *</label>
+                            <input type="text" id="no_company_name" required placeholder="Company name..." autocomplete="off"
                                    class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
@@ -841,18 +840,37 @@ async function renderNewOrder(container) {
                             <input type="text" id="no_contact_person" placeholder="e.g. Shreya" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Phone</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Phone 1</label>
                             <input type="tel" id="no_phone" placeholder="9876543210" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Phone 2</label>
+                            <input type="tel" id="no_phone_2" placeholder="9876543210" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">City</label>
                             <input type="text" id="no_city" placeholder="e.g. Delhi" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">State</label>
+                            <select id="no_state" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="" disabled selected>Select state...</option>
+                                ${['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Chandigarh','Puducherry']
+                                    .map(s => `<option value="${s}">${s}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Payment Type *</label>
-                            <select id="no_payment_type" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <option value="ADVANCE">ADVANCE</option>
-                                <option value="CREDIT">CREDIT</option>
+                            <select id="no_payment_type" required onchange="handlePaymentTypeChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="CASH">CASH</option>
+                                <option value="UPI">UPI</option>
+                                <option value="BANK">BANK</option>
+                            </select>
+                            <select id="no_bank_name" style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="" disabled selected>Select bank...</option>
+                                <option value="KOTAK">KOTAK</option>
+                                <option value="PNB">PNB</option>
+                                <option value="HDFC">HDFC</option>
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
@@ -864,13 +882,17 @@ async function renderNewOrder(container) {
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Sales Person *</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Order Taken Through *</label>
                             <select id="no_sales" required onchange="handleSalesChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <option value="" disabled selected>Assign sales...</option>
-                                ${(salesUsers || []).map(u => `<option value="${escapeHtml(u.full_name)}">${escapeHtml(u.full_name)}</option>`).join('')}
+                                <option value="" disabled selected>Select source...</option>
+                                <option value="Meena Bansal">Meena Bansal</option>
+                                <option value="Ansu Bansal">Ansu Bansal</option>
+                                <option value="Shubhash Bansal">Shubhash Bansal</option>
+                                <option value="IndiaMart">IndiaMart</option>
+                                <option value="Manisha">Manisha</option>
                                 <option value="__OTHER__">+ Others (type name)</option>
                             </select>
-                            <input type="text" id="no_sales_custom" placeholder="Enter sales person name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <input type="text" id="no_sales_custom" placeholder="Enter name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                     </div>
                     <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
@@ -1386,20 +1408,26 @@ window.handleCreateOrder = async function(e) {
     lucide.createIcons();
     try {
         const salesEl = document.getElementById('no_sales');
-        const customerNameInput = document.getElementById('no_customer_name').value.trim();
+        const companyNameInput = document.getElementById('no_company_name').value.trim();
         const customerPhoneInput = document.getElementById('no_phone').value.trim() || null;
+        const customerPhone2Input = document.getElementById('no_phone_2').value.trim() || null;
+        const paymentTypeInput = document.getElementById('no_payment_type').value;
+        const bankNameInput = paymentTypeInput === 'BANK' ? (document.getElementById('no_bank_name').value || null) : null;
 
         // order_code/order_number are generated server-side by the create_order RPC
-        const customerId = await window.db.upsertCustomer(currentOrgId, customerNameInput, customerPhoneInput);
+        const customerId = await window.db.upsertCustomer(currentOrgId, companyNameInput, customerPhoneInput);
 
         const newOrder = await window.db.createOrder({
             organizationId: currentOrgId,
             customerId: customerId,
-            customerName: customerNameInput,
+            customerName: companyNameInput,
             customerPhone: customerPhoneInput,
+            customerPhone2: customerPhone2Input,
             contactPerson: document.getElementById('no_contact_person').value.trim() || null,
             city: document.getElementById('no_city').value.trim() || null,
-            paymentType: document.getElementById('no_payment_type').value,
+            state: document.getElementById('no_state').value || null,
+            paymentType: paymentTypeInput,
+            bankName: bankNameInput,
             dispatchMode: document.getElementById('no_mode').value,
             salesPersonName: salesEl.value === '__OTHER__'
                 ? document.getElementById('no_sales_custom').value.trim()
@@ -2672,6 +2700,18 @@ async function renderAnalytics(container) {
         });
     }, 50);
 }
+window.handlePaymentTypeChange = function(selectEl) {
+    const bankSelect = document.getElementById('no_bank_name');
+    if (selectEl.value === 'BANK') {
+        bankSelect.style.display = 'block';
+        bankSelect.required = true;
+    } else {
+        bankSelect.style.display = 'none';
+        bankSelect.required = false;
+        bankSelect.value = '';
+    }
+};
+
 window.handleSalesChange = function(selectEl) {
     const customInput = document.getElementById('no_sales_custom');
     if (selectEl.value === '__OTHER__') {
