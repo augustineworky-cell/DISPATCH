@@ -335,12 +335,13 @@ window.db = {
     // ─── PACKING ASSIGNMENT ───
     // Orders approaching/at the packing stage, for the admin assignment page.
     async getOrdersForPackingAssignment() {
-        const { data } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('orders')
             .select('*')
             .in('current_step', ['STEP4_SENT_TO_PACKING', 'STEP5_PACKING_DONE'])
             .eq('is_deleted', false).eq('is_cancelled', false)
             .order('packing_priority', { ascending: true, nullsFirst: false });
+        if (error) { console.error('getOrdersForPackingAssignment:', error); throw error; }
         return data || [];
     },
 
@@ -354,7 +355,7 @@ window.db = {
 
     // Mobile packing queue: assigned + not yet accepted, sorted by priority.
     async getPackingQueue() {
-        const { data } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('orders')
             .select('*')
             .eq('current_step', 'STEP5_PACKING_DONE')
@@ -362,18 +363,20 @@ window.db = {
             .is('packing_accepted_at', null)
             .eq('is_deleted', false).eq('is_cancelled', false)
             .order('packing_priority', { ascending: true, nullsFirst: false });
+        if (error) { console.error('getPackingQueue:', error); throw error; }
         return data || [];
     },
 
     // Accepted, in-progress packing orders for the current device/user.
     async getAcceptedPackingOrders() {
-        const { data } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('orders')
             .select('*')
             .eq('current_step', 'STEP5_PACKING_DONE')
             .not('packing_accepted_at', 'is', null)
             .eq('is_deleted', false).eq('is_cancelled', false)
             .order('packing_accepted_at', { ascending: true });
+        if (error) { console.error('getAcceptedPackingOrders:', error); throw error; }
         return data || [];
     },
 

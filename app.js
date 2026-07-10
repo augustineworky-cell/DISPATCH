@@ -3044,7 +3044,18 @@ const PACKER_NAMES = ['Chotu','Tarun','Prince','Nitesh','Deepu','Surya','Bheem',
 
 async function renderPackingAssignment(container) {
     container.innerHTML = renderLoadingState();
-    const orders = await window.db.getOrdersForPackingAssignment();
+    let orders;
+    try {
+        orders = await window.db.getOrdersForPackingAssignment();
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="max-w-2xl mx-auto mt-10 p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <p class="font-bold mb-1">Couldn't load packing orders</p>
+            <p>${escapeHtml(err.message || 'Unknown error')}</p>
+            <p class="mt-2 text-xs text-red-500">This usually means migration_003_packing_assignment.sql hasn't been run in Supabase yet.</p>
+        </div>`;
+        return;
+    }
 
     container.innerHTML = `
         <div class="max-w-5xl mx-auto animate-in">
