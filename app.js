@@ -102,6 +102,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('📱 Mobile detected, redirecting...');
                 location.hash = '#/mobile/orders';
             }
+
+            // Someone forced desktop view earlier but is still on a narrow
+            // device — give them a guaranteed-visible way back, independent
+            // of the sidebar's own responsive CSS (which hides it below 768px
+            // anyway, so a button placed inside it would never be seen here).
+            if (forcedDesktop && window.innerWidth < 768) {
+                const btn = document.createElement('button');
+                btn.id = 'back-to-mobile-fab';
+                btn.innerHTML = '<i data-lucide="smartphone" style="width:20px;height:20px"></i>';
+                btn.title = 'Switch back to mobile view';
+                btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;width:48px;height:48px;border-radius:9999px;background:#f59e0b;color:white;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.25);border:none;';
+                btn.onclick = () => {
+                    localStorage.removeItem('bmh_force_desktop');
+                    location.hash = '#/mobile/orders';
+                    location.reload();
+                };
+                document.body.appendChild(btn);
+                lucide.createIcons();
+            }
         }
     }
     window.addEventListener('hashchange', router);
@@ -1636,28 +1655,73 @@ async function renderMobileOrders(container) {
     window.__mobileOrderData = { activeOrders };
 
     const delayedCount = activeOrders.filter(o => o.is_delayed).length;
+    const dispatchedToday = allOrders.filter(o => o.is_completed && o.completed_date && new Date(o.completed_date).toDateString() === new Date().toDateString()).length;
 
     container.innerHTML = `
-        <div class="min-h-screen bg-gray-50" style="padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))">
-            <!-- Compact Mobile Header -->
-            <header class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white sticky top-0 z-30 shadow-md" style="padding-top: env(safe-area-inset-top, 0px)">
-                <div class="px-4 py-3 flex items-center justify-between" style="min-height: 56px">
-                    <div class="flex items-center gap-2.5">
-                        <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-lg">
-                        <div>
-                            <h1 class="font-extrabold text-base leading-tight">BMH Dispatch</h1>
-                            <p class="text-[10px] text-indigo-200 mt-0.5 font-medium">${activeOrders.length} active</p>
+        <div class="min-h-screen" style="background:#f5f4ff; padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px))">
+            <!-- Bold gradient header, Zepto/Blinkit-style -->
+            <header class="bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 text-white sticky top-0 z-30 shadow-lg rounded-b-[28px]" style="padding-top: env(safe-area-inset-top, 0px)">
+                <div class="px-4 pt-4 pb-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-xl shadow-md">
+                            <div>
+                                <h1 class="font-extrabold text-lg leading-tight tracking-tight">BMH Dispatch</h1>
+                                <p class="text-[11px] text-white/70 font-medium">Hi, ${currentUser?.full_name?.split(' ')[0] || 'there'} 👋</p>
+                            </div>
                         </div>
+                        <button onclick="renderMobileOrders(document.getElementById('main-content'))"
+                            class="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 active:bg-white/25 transition-colors">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        </button>
                     </div>
-                    <button onclick="renderMobileOrders(document.getElementById('main-content'))"
-                        class="text-white/70 hover:text-white p-2 rounded-xl active:bg-white/10 transition-colors">
-                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+
+                    <!-- Search bar, rounded pill (Zepto-style) -->
+                    <button onclick="document.getElementById('mobile-search-trigger')?.click()" class="w-full bg-white rounded-2xl px-4 py-3 flex items-center gap-2.5 shadow-md">
+                        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+                        <span class="text-sm text-gray-400 font-medium">Search orders, customers...</span>
                     </button>
                 </div>
             </header>
 
+            <!-- Colorful KPI chip row, Zepto-promo-card style -->
+            <div class="px-4 -mt-1 mb-1 grid grid-cols-3 gap-2.5 relative z-10">
+                <div class="bg-white rounded-2xl p-3 shadow-md text-center">
+                    <p class="text-2xl font-extrabold text-indigo-600 leading-none">${activeOrders.length}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-1">Active</p>
+                </div>
+                <div class="rounded-2xl p-3 shadow-md text-center ${delayedCount > 0 ? 'bg-gradient-to-br from-red-500 to-orange-500 text-white' : 'bg-white'}">
+                    <p class="text-2xl font-extrabold leading-none ${delayedCount > 0 ? 'text-white' : 'text-gray-300'}">${delayedCount}</p>
+                    <p class="text-[10px] font-bold uppercase tracking-wide mt-1 ${delayedCount > 0 ? 'text-white/80' : 'text-gray-400'}">Delayed</p>
+                </div>
+                <div class="bg-white rounded-2xl p-3 shadow-md text-center">
+                    <p class="text-2xl font-extrabold text-emerald-500 leading-none">${dispatchedToday}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-1">Today</p>
+                </div>
+            </div>
+
+            <!-- Quick-access icon row, Zepto category-row style -->
+            <div class="flex justify-around px-3 py-4">
+                <button onclick="switchMobileTab('all')" class="flex flex-col items-center gap-1.5">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center"><i data-lucide="list" class="w-5 h-5 text-indigo-600"></i></div>
+                    <span class="text-[11px] font-bold text-gray-600">All</span>
+                </button>
+                <button onclick="switchMobileTab('delayed')" class="flex flex-col items-center gap-1.5">
+                    <div class="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i></div>
+                    <span class="text-[11px] font-bold text-gray-600">Delayed</span>
+                </button>
+                <button onclick="renderPackingQueueMobile(document.getElementById('main-content'))" class="flex flex-col items-center gap-1.5">
+                    <div class="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center"><i data-lucide="package-check" class="w-5 h-5 text-orange-600"></i></div>
+                    <span class="text-[11px] font-bold text-gray-600">Packing</span>
+                </button>
+                <button onclick="location.hash='#/orders/new'" class="flex flex-col items-center gap-1.5">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center"><i data-lucide="plus" class="w-5 h-5 text-emerald-600"></i></div>
+                    <span class="text-[11px] font-bold text-gray-600">New</span>
+                </button>
+            </div>
+
             <!-- Orders List -->
-            <div id="mobile-orders-list" class="px-3 pt-3 space-y-2.5">
+            <div id="mobile-orders-list" class="px-3.5 pt-1 space-y-3">
                 ${activeOrders.length === 0 ? `
                     <div class="text-center py-16 px-6">
                         <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -1678,8 +1742,12 @@ async function renderMobileOrders(container) {
     navEl.id = 'mobile-bottom-nav';
     navEl.innerHTML = `
         <button class="mob-nav-tab active" data-mob-tab="all" onclick="switchMobileTab('all')">
-            <i data-lucide="list" class="w-[22px] h-[22px]"></i>
-            <span>All</span>
+            <i data-lucide="home" class="w-[22px] h-[22px]"></i>
+            <span>Home</span>
+        </button>
+        <button class="mob-nav-tab" onclick="renderPackingQueueMobile(document.getElementById('main-content'))">
+            <i data-lucide="package-check" class="w-[22px] h-[22px]"></i>
+            <span>Packing</span>
         </button>
         <button class="mob-nav-center" onclick="location.hash='#/orders/new'" aria-label="New order">
             <div class="mob-nav-plus">
@@ -1687,10 +1755,14 @@ async function renderMobileOrders(container) {
             </div>
             <span class="mob-nav-center-label">New</span>
         </button>
+        <button class="mob-nav-tab" onclick="switchMobileTab('delayed')">
+            <i data-lucide="alert-triangle" class="w-[22px] h-[22px]"></i>
+            <span>Delayed</span>
+            ${delayedCount > 0 ? `<span class="mob-nav-badge" style="background:#ef4444">${delayedCount > 9 ? '9+' : delayedCount}</span>` : ''}
+        </button>
         <button class="mob-nav-tab" onclick="showMobileMoreSheet()">
             <i data-lucide="more-horizontal" class="w-[22px] h-[22px]"></i>
             <span>More</span>
-            ${delayedCount > 0 ? `<span class="mob-nav-badge" style="background:#f59e0b">${delayedCount > 9 ? '9+' : delayedCount}</span>` : ''}
         </button>`;
     document.body.appendChild(navEl);
 
@@ -1700,6 +1772,7 @@ async function renderMobileOrders(container) {
 function renderMobileOrderCard(o) {
     const stageName = o.current_step ? stepName(o.current_step) : 'Dispatched';
     const dateStr = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', {day:'2-digit', month:'short'}) : '—';
+    const initials = (o.customer_name || '?').trim().substring(0, 2).toUpperCase();
 
     // Stage progress dots — 6 submittable steps
     const stageDots = stepsDirectory.map(code => {
@@ -1712,29 +1785,29 @@ function renderMobileOrderCard(o) {
     }).join('');
 
     return `
-        <div onclick="openOrderDrawer('${o.id}')" class="mob-order-card${o.is_delayed ? ' is-delayed' : ''}">
-            <!-- Badges row -->
-            <div class="flex items-center gap-1.5 mb-2.5 flex-wrap">
-                <span class="font-mono text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">${o.order_code}</span>
-                ${o.is_delayed ? '<span class="text-[10px] font-extrabold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">⚠ DELAYED</span>' : ''}
-            </div>
-            <!-- Customer -->
-            <div class="flex items-start justify-between gap-3 mb-3">
+        <div onclick="openOrderDrawer('${o.id}')" class="bg-white rounded-2xl shadow-sm active:shadow-md active:scale-[0.99] transition-all p-3.5 ${o.is_delayed ? 'ring-2 ring-red-400' : ''}">
+            <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 font-extrabold text-sm text-white"
+                     style="background: linear-gradient(135deg, ${o.is_delayed ? '#ef4444, #f97316' : '#6366f1, #a855f7'})">
+                    ${initials}
+                </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="font-extrabold text-gray-900 leading-snug" style="font-size:17px">${escapeHtml(o.customer_name)}</h3>
-                    ${o.customer_phone ? `<p class="text-sm text-gray-400 mt-0.5 font-medium">${o.customer_phone}</p>` : ''}
-                </div>
-                <div class="text-right flex-shrink-0">
-                    <div class="text-xs text-gray-400 mt-1">${dateStr}</div>
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="font-extrabold text-gray-900 text-[15px] truncate">${escapeHtml(o.customer_name)}</h3>
+                        <span class="text-[10px] text-gray-400 font-semibold flex-shrink-0">${dateStr}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span class="font-mono text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">${o.order_code}</span>
+                        ${o.is_delayed ? '<span class="text-[10px] font-extrabold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">⚠ DELAYED</span>' : ''}
+                    </div>
                 </div>
             </div>
-            <!-- Stage progress + open -->
-            <div class="flex items-center justify-between pt-2.5 border-t border-gray-100">
+            <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-gray-50">
                 <div>
-                    <div class="stage-dots mb-1.5">${stageDots}</div>
-                    <span class="text-xs font-bold text-gray-600">${stageName}</span>
+                    <div class="stage-dots mb-1">${stageDots}</div>
+                    <span class="text-[11px] font-bold text-gray-500">${stageName}</span>
                 </div>
-                <div class="mob-card-open-btn">
+                <div class="w-7 h-7 rounded-full bg-indigo-50 flex items-center justify-center">
                     <i data-lucide="chevron-right" class="w-4 h-4 text-indigo-500"></i>
                 </div>
             </div>
