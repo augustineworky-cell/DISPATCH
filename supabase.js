@@ -12,8 +12,8 @@
 // the order directly rather than landing in an approval queue. Add these
 // back later if BMH ever needs a WhatsApp-bot-style intake queue.
 // ============================================================================
-const SUPABASE_URL = 'PASTE_YOUR_BMH_SUPABASE_URL_HERE';
-const SUPABASE_ANON_KEY = 'PASTE_YOUR_BMH_ANON_KEY_HERE';
+const SUPABASE_URL = 'https://yoypuxathaxhbfbqhuwo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlveXB1eGF0aGF4aGJmYnFodXdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTI0ODAsImV4cCI6MjA5OTA2ODQ4MH0.YRwYptquEP8TYH_CSnfCWBkKUvpr31SGicriGMaFoE4';
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
