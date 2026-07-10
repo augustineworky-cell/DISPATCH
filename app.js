@@ -1698,7 +1698,7 @@ async function renderMobileHome(container) {
     location.hash = '#/mobile/orders';
 }
 
-async function renderMobileOrders(container) {
+async function renderMobileOrders(container, filter = 'all') {
     // Hide sidebar + topbar on mobile view
     document.body.classList.add('mobile-view');
 
@@ -1707,6 +1707,7 @@ async function renderMobileOrders(container) {
     // BMH has no accept/assign workflow — just show all active orders.
     const allOrders = (await window.db.getOrders()) || [];
     const activeOrders = allOrders.filter(o => !o.is_completed && !o.is_cancelled);
+    const listToShow = filter === 'delayed' ? activeOrders.filter(o => o.is_delayed) : activeOrders;
 
     window.__mobileOrderData = { activeOrders };
 
@@ -1758,11 +1759,11 @@ async function renderMobileOrders(container) {
 
             <!-- Quick-access icon row, Zepto category-row style -->
             <div class="flex justify-around px-3 py-4">
-                <button onclick="switchMobileTab('all')" class="flex flex-col items-center gap-1.5">
+                <button onclick="renderMobileOrders(document.getElementById('main-content'), 'all')" class="flex flex-col items-center gap-1.5">
                     <div class="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center"><i data-lucide="list" class="w-5 h-5 text-indigo-600"></i></div>
                     <span class="text-[11px] font-bold text-gray-600">All</span>
                 </button>
-                <button onclick="switchMobileTab('delayed')" class="flex flex-col items-center gap-1.5">
+                <button onclick="renderMobileOrders(document.getElementById('main-content'), 'delayed')" class="flex flex-col items-center gap-1.5">
                     <div class="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i></div>
                     <span class="text-[11px] font-bold text-gray-600">Delayed</span>
                 </button>
@@ -1778,15 +1779,15 @@ async function renderMobileOrders(container) {
 
             <!-- Orders List -->
             <div id="mobile-orders-list" class="px-3.5 pt-1 space-y-3">
-                ${activeOrders.length === 0 ? `
+                ${listToShow.length === 0 ? `
                     <div class="text-center py-16 px-6">
                         <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
                             <i data-lucide="check-circle-2" class="w-9 h-9 text-emerald-400"></i>
                         </div>
-                        <p class="font-bold text-gray-700 text-lg">All caught up!</p>
-                        <p class="text-sm text-gray-400 mt-1.5">No active orders</p>
+                        <p class="font-bold text-gray-700 text-lg">${filter === 'delayed' ? 'No delayed orders!' : 'All caught up!'}</p>
+                        <p class="text-sm text-gray-400 mt-1.5">${filter === 'delayed' ? 'Everything is on time' : 'No active orders'}</p>
                     </div>
-                ` : activeOrders.map(o => renderMobileOrderCard(o)).join('')}
+                ` : listToShow.map(o => renderMobileOrderCard(o)).join('')}
             </div>
         </div>`;
 
@@ -1797,7 +1798,7 @@ async function renderMobileOrders(container) {
     navEl.className = 'mobile-bottom-nav';
     navEl.id = 'mobile-bottom-nav';
     navEl.innerHTML = `
-        <button class="mob-nav-tab active" data-mob-tab="all" onclick="switchMobileTab('all')">
+        <button class="mob-nav-tab${filter === 'all' ? ' active' : ''}" onclick="renderMobileOrders(document.getElementById('main-content'), 'all')">
             <i data-lucide="home" class="w-[22px] h-[22px]"></i>
             <span>Home</span>
         </button>
@@ -1811,7 +1812,7 @@ async function renderMobileOrders(container) {
             </div>
             <span class="mob-nav-center-label">New</span>
         </button>
-        <button class="mob-nav-tab" onclick="switchMobileTab('delayed')">
+        <button class="mob-nav-tab${filter === 'delayed' ? ' active' : ''}" onclick="renderMobileOrders(document.getElementById('main-content'), 'delayed')">
             <i data-lucide="alert-triangle" class="w-[22px] h-[22px]"></i>
             <span>Delayed</span>
             ${delayedCount > 0 ? `<span class="mob-nav-badge" style="background:#ef4444">${delayedCount > 9 ? '9+' : delayedCount}</span>` : ''}
@@ -1991,7 +1992,7 @@ window.showMobileMoreSheet = function() {
         <div class="fixed bottom-0 left-0 right-0 z-[91] bg-white rounded-t-2xl shadow-2xl" style="padding-bottom: env(safe-area-inset-bottom, 16px)">
             <div class="w-9 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-2"></div>
             <div class="px-3 pb-3 space-y-1">
-                <button onclick="switchMobileTab('delayed'); document.getElementById('mobile-more-sheet').remove()"
+                <button onclick="renderMobileOrders(document.getElementById('main-content'), 'delayed'); document.getElementById('mobile-more-sheet').remove()"
                     class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left active:bg-amber-50 transition-colors">
                     <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
                         <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600"></i>
