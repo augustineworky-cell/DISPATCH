@@ -332,6 +332,69 @@ window.db = {
         return data.token;
     },
 
+    // ─── PACKING ASSIGNMENT ───
+    // Orders approaching/at the packing stage, for the admin assignment page.
+    async getOrdersForPackingAssignment() {
+        const { data } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .in('current_step', ['STEP4_SENT_TO_PACKING', 'STEP5_PACKING_DONE'])
+            .eq('is_deleted', false).eq('is_cancelled', false)
+            .order('packing_priority', { ascending: true, nullsFirst: false });
+        return data || [];
+    },
+
+    async assignPacker(orderId, packerName, priority) {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({ assigned_packer: packerName || null, packing_priority: priority ?? null })
+            .eq('id', orderId);
+        if (error) throw error;
+    },
+
+    // Mobile packing queue: assigned + not yet accepted, sorted by priority.
+    async getPackingQueue() {
+        const { data } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('current_step', 'STEP5_PACKING_DONE')
+            .not('assigned_packer', 'is', null)
+            .is('packing_accepted_at', null)
+            .eq('is_deleted', false).eq('is_cancelled', false)
+            .order('packing_priority', { ascending: true, nullsFirst: false });
+        return data || [];
+    },
+
+    // Accepted, in-progress packing orders for the current device/user.
+    async getAcceptedPackingOrders() {
+        const { data } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('current_step', 'STEP5_PACKING_DONE')
+            .not('packing_accepted_at', 'is', null)
+            .eq('is_deleted', false).eq('is_cancelled', false)
+            .order('packing_accepted_at', { ascending: true });
+        return data || [];
+    },
+
+    async acceptPackingOrder(orderId, userId) {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({ packing_accepted_at: new Date().toISOString(), packing_accepted_by: userId })
+            .eq('id', orderId);
+        if (error) throw error;
+    },
+
+    // Fetch the Performa Invoice proof (STEP2) so packers can see what to pack.
+    async getPISubmission(orderId) {
+        const { data } = await supabaseClient
+            .from('step_submissions')
+            .select('form_data')
+            .eq('order_id', orderId).eq('step_code', 'STEP2_PI_CREATED').eq('is_latest', true)
+            .maybeSingle();
+        return data?.form_data || null;
+    },
+
     async cancelOrder(orderId, reason) {
         const session = await this.getSession();
         const { error } = await supabaseClient

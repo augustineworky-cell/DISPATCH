@@ -148,7 +148,9 @@ function refreshCurrentView_() {
     const hash = location.hash || '#/dashboard';
     if (hash === '#/mobile/orders') {
         renderMobileOrders(document.getElementById('main-content'));
-    } else if (['#/orders', '#/dashboard', '#/board'].includes(hash)) {
+    } else if (hash === '#/mobile/packing-queue') {
+        renderPackingQueueMobile(document.getElementById('main-content'));
+    } else if (['#/orders', '#/dashboard', '#/board', '#/packing-assignment'].includes(hash)) {
         router();
     }
 }
@@ -199,8 +201,16 @@ async function router() {
         else if (hash === '#/orders/new') await renderNewOrder(main);
         else if (hash === '#/customers') await renderCustomers(main);
         else if (hash === '#/analytics') await renderAnalytics(main);
+        else if (hash === '#/packing-assignment') {
+            if (!['admin', 'manager'].includes(currentUser?.role)) {
+                main.innerHTML = '<div class="p-8 text-center text-gray-500">You don\'t have access to this page.</div>';
+            } else {
+                await renderPackingAssignment(main);
+            }
+        }
         else if (hash === '#/mobile') await renderMobileHome(main);
         else if (hash === '#/mobile/orders') await renderMobileOrders(main);
+        else if (hash === '#/mobile/packing-queue') await renderPackingQueueMobile(main);
         else main.innerHTML = '<div class="p-8 text-center text-gray-500">Page not found.</div>';
         
         lucide.createIcons();
@@ -230,6 +240,7 @@ function renderSidebar() {
                 ${navItem('#/orders', 'shopping-cart', t('orders'), path.includes('orders') && !path.includes('new'))}
                 ${navItem('#/customers', 'users', 'Customers', path.includes('customers'))}
                 ${navItem('#/analytics', 'bar-chart-3', 'Analytics', path.includes('analytics'))}
+                ${['admin', 'manager'].includes(currentUser?.role) ? navItem('#/packing-assignment', 'clipboard-list', 'Packing Assignment', path.includes('packing-assignment')) : ''}
             </nav>
             <div class="p-4 bg-black/20 backdrop-blur-sm m-4 rounded-xl border border-white/10">
                 <div class="flex items-center gap-3">
@@ -1779,6 +1790,16 @@ window.showMobileMoreSheet = function() {
                     </div>
                     ${delayedCount > 0 ? `<span class="bg-amber-500 text-white text-xs font-extrabold px-2 py-1 rounded-full min-w-[24px] text-center">${delayedCount}</span>` : ''}
                 </button>
+                <button onclick="renderPackingQueueMobile(document.getElementById('main-content')); document.getElementById('mobile-more-sheet')?.remove()"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left active:bg-orange-50 transition-colors">
+                    <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="package-check" class="w-5 h-5 text-orange-600"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-gray-800">Packing Queue</div>
+                        <div class="text-xs text-gray-400 mt-0.5">Orders assigned for packing</div>
+                    </div>
+                </button>
                 <button onclick="renderMobileOrders(document.getElementById('main-content')); document.getElementById('mobile-more-sheet')?.remove()"
                     class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left active:bg-gray-50 transition-colors">
                     <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -3013,6 +3034,229 @@ const VoiceNotes = {
         } else {
             this.start(textarea, button);
         }
+    }
+};
+
+// ==========================================
+// PACKING ASSIGNMENT (admin/manager only)
+// ==========================================
+const PACKER_NAMES = ['Chotu','Tarun','Prince','Nitesh','Deepu','Surya','Bheem','Bhavesh','Deepak','Chander','Ranjeet'];
+
+async function renderPackingAssignment(container) {
+    container.innerHTML = renderLoadingState();
+    const orders = await window.db.getOrdersForPackingAssignment();
+
+    container.innerHTML = `
+        <div class="max-w-5xl mx-auto animate-in">
+            <div class="mb-6">
+                <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Packing Assignment</h2>
+                <p class="text-sm text-gray-500 mt-1">Assign a packer and set priority for orders approaching the packing stage.</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="grid grid-cols-12 gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <div class="col-span-3">Order</div>
+                    <div class="col-span-3">Customer</div>
+                    <div class="col-span-2">Step</div>
+                    <div class="col-span-2">Packer</div>
+                    <div class="col-span-2">Priority</div>
+                </div>
+                ${orders.length === 0 ? `<div class="p-10 text-center text-gray-400 text-sm">No orders currently approaching the packing stage.</div>` : orders.map(o => `
+                    <div class="grid grid-cols-12 gap-2 px-5 py-3 border-b border-gray-50 items-center" data-order-row="${o.id}">
+                        <div class="col-span-3">
+                            <p class="font-bold text-sm text-gray-900">${o.order_code}</p>
+                            <p class="text-[11px] text-gray-400">${stepName(o.current_step)}</p>
+                        </div>
+                        <div class="col-span-3 text-sm text-gray-700">${escapeHtml(o.customer_name)}</div>
+                        <div class="col-span-2">
+                            <span class="text-[11px] font-bold px-2 py-1 rounded ${o.current_step === 'STEP5_PACKING_DONE' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}">
+                                ${o.current_step === 'STEP5_PACKING_DONE' ? 'Ready to pack' : 'Sent to packing'}
+                            </span>
+                        </div>
+                        <div class="col-span-2">
+                            <select onchange="handlePackerAssign('${o.id}', this.value, document.getElementById('priority-${o.id}').value)" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                                <option value="" ${!o.assigned_packer ? 'selected' : ''}>Unassigned</option>
+                                ${PACKER_NAMES.map(p => `<option value="${p}" ${o.assigned_packer === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <input type="number" id="priority-${o.id}" value="${o.packing_priority ?? ''}" placeholder="—"
+                                onchange="handlePackerAssign('${o.id}', this.parentElement.parentElement.querySelector('select').value, this.value)"
+                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs" min="1">
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+}
+
+window.handlePackerAssign = async function(orderId, packerName, priority) {
+    try {
+        await window.db.assignPacker(orderId, packerName || null, priority ? parseInt(priority, 10) : null);
+        showToast('Packing assignment updated', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+};
+
+// ==========================================
+// PACKING QUEUE (mobile, Blinkit-style accept + checklist)
+// ==========================================
+async function renderPackingQueueMobile(container) {
+    document.body.classList.add('mobile-view');
+    container.innerHTML = renderLoadingState();
+
+    const [pending, accepted] = await Promise.all([
+        window.db.getPackingQueue(),
+        window.db.getAcceptedPackingOrders()
+    ]);
+
+    container.innerHTML = `
+        <div class="min-h-screen bg-gray-50 px-3 pt-3" style="padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px))">
+            <div class="flex items-center gap-2 mb-4">
+                <button onclick="location.hash='#/mobile/orders'" class="p-2 -ml-2"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+                <h1 class="font-extrabold text-lg text-gray-900">Packing Queue</h1>
+            </div>
+
+            ${pending.length > 0 ? `
+                <div class="mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider px-1">New Orders (${pending.length})</div>
+                ${pending.map(o => renderPackingRequestCard(o)).join('')}
+            ` : ''}
+
+            ${accepted.length > 0 ? `
+                <div class="mt-5 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider px-1">In Progress</div>
+                ${accepted.map(o => renderPackingChecklistCard(o)).join('')}
+            ` : ''}
+
+            ${pending.length === 0 && accepted.length === 0 ? `
+                <div class="text-center py-16 px-6">
+                    <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="package-check" class="w-9 h-9 text-emerald-400"></i>
+                    </div>
+                    <p class="font-bold text-gray-700">No packing orders right now</p>
+                </div>
+            ` : ''}
+        </div>`;
+    lucide.createIcons();
+}
+
+function renderPackingRequestCard(o) {
+    return `
+        <div class="bg-white rounded-2xl shadow-md border-2 border-indigo-500 p-4 mb-3 relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 bg-indigo-600 text-white text-[10px] font-extrabold tracking-wider uppercase text-center py-1">
+                🔔 New Order
+            </div>
+            <div class="mt-5">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="font-mono text-xs font-bold text-indigo-600">${o.order_code}</p>
+                        <p class="font-extrabold text-gray-900">${escapeHtml(o.customer_name)}</p>
+                    </div>
+                    ${o.packing_priority ? `<span class="text-xs font-bold px-2 py-1 rounded bg-amber-100 text-amber-700">Priority ${o.packing_priority}</span>` : ''}
+                </div>
+                <p class="text-xs text-gray-400 mb-3">Assigned to: <span class="font-bold text-gray-600">${o.assigned_packer}</span></p>
+                <div class="flex gap-2">
+                    <button onclick="viewPackingPI('${o.id}')" class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-bold flex items-center justify-center gap-1.5">
+                        <i data-lucide="file-text" class="w-4 h-4"></i> View PI
+                    </button>
+                    <button onclick="acceptPackingOrder('${o.id}')" class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold flex items-center justify-center gap-1.5">
+                        <i data-lucide="check" class="w-4 h-4"></i> Accept
+                    </button>
+                </div>
+            </div>
+        </div>`;
+}
+
+function renderPackingChecklistCard(o) {
+    return `
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-3">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <p class="font-mono text-xs font-bold text-gray-500">${o.order_code}</p>
+                    <p class="font-extrabold text-gray-900">${escapeHtml(o.customer_name)}</p>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-1 rounded bg-orange-100 text-orange-700">${o.assigned_packer}</span>
+            </div>
+            <form onsubmit="submitPackingChecklist(event, '${o.id}')" class="space-y-2.5">
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500">Weight (kg)</label>
+                        <input type="number" step="0.01" id="pk-weight-${o.id}" required class="w-full border rounded-lg p-2 text-sm mt-0.5">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500">No. of Cartons</label>
+                        <input type="number" id="pk-cartons-${o.id}" required class="w-full border rounded-lg p-2 text-sm mt-0.5">
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-3 pt-1">
+                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-quality-${o.id}"> Quality check</label>
+                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-label-${o.id}"> Labelling correct</label>
+                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-marka-${o.id}"> Private marka</label>
+                </div>
+                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500">Photo before packing</label>
+                        <input type="file" id="pk-photo-before-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-500">Photo after packing</label>
+                        <input type="file" id="pk-photo-after-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
+                    </div>
+                </div>
+                <textarea id="pk-notes-${o.id}" placeholder="Notes (optional)" class="w-full border rounded-lg p-2 text-sm h-16 mt-1"></textarea>
+                <button type="submit" id="pk-submit-${o.id}" class="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold">Complete Packing</button>
+            </form>
+        </div>`;
+}
+
+window.viewPackingPI = async function(orderId) {
+    const piData = await window.db.getPISubmission(orderId);
+    if (piData?.file_url) {
+        window.open(piData.file_url, '_blank');
+    } else {
+        showToast('No PI file uploaded for this order yet', 'error');
+    }
+};
+
+window.acceptPackingOrder = async function(orderId) {
+    try {
+        await window.db.acceptPackingOrder(orderId, currentUser.id);
+        showToast('Order accepted', 'success');
+        renderPackingQueueMobile(document.getElementById('main-content'));
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+};
+
+window.submitPackingChecklist = async function(e, orderId) {
+    e.preventDefault();
+    const btn = document.getElementById(`pk-submit-${orderId}`);
+    btn.disabled = true;
+    btn.innerText = 'Submitting...';
+    try {
+        const formData = {
+            submitted_at: new Date().toISOString(),
+            submitted_by: currentUser.id,
+            weight_kg: parseFloat(document.getElementById(`pk-weight-${orderId}`).value),
+            num_cartons: parseInt(document.getElementById(`pk-cartons-${orderId}`).value, 10),
+            quality_check: document.getElementById(`pk-quality-${orderId}`).checked,
+            labelling_check: document.getElementById(`pk-label-${orderId}`).checked,
+            private_marka_check: document.getElementById(`pk-marka-${orderId}`).checked
+        };
+        const notes = document.getElementById(`pk-notes-${orderId}`).value;
+        if (notes) formData.notes = notes;
+
+        const beforeFile = document.getElementById(`pk-photo-before-${orderId}`).files[0];
+        const afterFile = document.getElementById(`pk-photo-after-${orderId}`).files[0];
+        if (beforeFile) formData.photo_before_url = await window.db.uploadFile('bmh-proofs', beforeFile);
+        if (afterFile) formData.photo_after_url = await window.db.uploadFile('bmh-proofs', afterFile);
+
+        await window.db.submitStep(orderId, 'STEP5_PACKING_DONE', formData);
+        showToast('Packing completed!', 'success');
+        renderPackingQueueMobile(document.getElementById('main-content'));
+    } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerText = 'Complete Packing';
     }
 };
 
