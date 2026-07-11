@@ -414,86 +414,9 @@ function escapeHtml(s) {
 // ==========================================
 // LOGIN
 // ==========================================
-// Generates a dense, realistic-ish leafy vine border for the login screen —
-// twisted overlapping branch strands with heart/teardrop leaf shapes
-// clustered heavily in the corners, thinning toward the middle. Built from
-// code (not a stock image) so there's no copyright concern.
-function buildVineBorderSVG_() {
-    const GREENS = ['#2d5016', '#3f6b28', '#4d7c3a', '#5f9450', '#6ba34d'];
-    const BROWNS = ['#4a2f18', '#5a3a1e', '#6b4423', '#7a4f2a'];
-    const LEAF_PATH = 'M0,-1.3 C-0.75,-1 -1.15,-0.25 -0.7,0.45 C-0.3,1.05 0,1.35 0,1.35 C0,1.35 0.3,1.05 0.7,0.45 C1.15,-0.25 0.75,-1 0,-1.3 Z';
-
-    function leaf(cx, cy, rot, scale, colorIdx) {
-        return `<path class="bmh-leaf" d="${LEAF_PATH}" fill="${GREENS[colorIdx % GREENS.length]}" opacity="0.93" transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)}) rotate(${rot}) scale(${scale.toFixed(2)})"/>`;
-    }
-
-    function branchStrand(pathD, colorIdx, width) {
-        return `<path d="${pathD}" fill="none" stroke="${BROWNS[colorIdx % BROWNS.length]}" stroke-width="${width}" stroke-linecap="round" opacity="0.88" vector-effect="non-scaling-stroke"/>`;
-    }
-
-    // One corner cluster: twisted branch strands curving in from (originX, originY),
-    // with a dense field of leaves along and around them, thinning with distance.
-    function cornerCluster(originX, originY, dirX, dirY, reach, leafCount) {
-        let svg = '';
-        // 3 overlapping twisted strands from the same corner, slightly offset
-        for (let s = 0; s < 3; s++) {
-            const offset = (s - 1) * 2.2;
-            const midX = originX + dirX * reach * 0.55 + offset;
-            const midY = originY + dirY * reach * 0.55 - offset * 0.5;
-            const endX = originX + dirX * reach + offset * 1.4;
-            const endY = originY + dirY * reach + offset * 0.7;
-            const d = `M ${originX} ${originY} Q ${midX} ${midY}, ${endX} ${endY}`;
-            svg += branchStrand(d, s, 0.7 - s * 0.15);
-        }
-        // Dense leaves, biased toward the corner, scattered along the reach
-        for (let i = 0; i < leafCount; i++) {
-            const t = i / leafCount;                      // 0 near corner, 1 far
-            const density = Math.pow(1 - t, 1.4);          // denser near the corner
-            const dist = t * reach + (i % 3) * 1.8;
-            const spreadPerp = ((i * 7) % 11 - 5) * (1.1 + t * 1.6);
-            const px = originX + dirX * dist - dirY * spreadPerp;
-            const py = originY + dirY * dist + dirX * spreadPerp;
-            const rot = (i * 53) % 360;
-            const scale = (0.55 + ((i * 17) % 10) / 14) * (0.7 + density * 0.6);
-            if (density < 0.08 && i % 2 === 0) continue;   // thin out the tail naturally
-            svg += leaf(px, py, rot, scale, i);
-        }
-        return svg;
-    }
-
-    let out = '';
-    // Top-left and top-right clusters reach diagonally down/inward
-    out += cornerCluster(-1, -1, 0.55, 0.75, 34, 26);
-    out += cornerCluster(101, -1, -0.55, 0.75, 34, 26);
-    // Bottom-left and bottom-right clusters reach diagonally up/inward
-    out += cornerCluster(-1, 101, 0.55, -0.75, 30, 22);
-    out += cornerCluster(101, 101, -0.55, -0.75, 30, 22);
-    return out;
-}
-
 function renderLoginUI() {
     return `
         <div class="flex-1 flex h-full min-h-screen relative">
-
-            <!-- ── Decorative leafy vine border (dense top + bottom clusters) ── -->
-            <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index:40;" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <style>
-                    @keyframes bmhLeafSway {
-                        0%, 100% { opacity: 1; transform: rotate(0deg); }
-                        50% { opacity: 0.75; transform: rotate(4deg); }
-                    }
-                    #bmh-vine-decoration .bmh-leaf {
-                        animation: bmhLeafSway 4s ease-in-out infinite;
-                        transform-box: fill-box;
-                        transform-origin: center;
-                    }
-                    #bmh-vine-decoration .bmh-leaf:nth-child(4n) { animation-delay: 0.4s; }
-                    #bmh-vine-decoration .bmh-leaf:nth-child(4n+1) { animation-delay: 1.1s; }
-                    #bmh-vine-decoration .bmh-leaf:nth-child(4n+2) { animation-delay: 1.8s; }
-                    #bmh-vine-decoration .bmh-leaf:nth-child(4n+3) { animation-delay: 2.5s; }
-                </style>
-                <g id="bmh-vine-decoration">${buildVineBorderSVG_()}</g>
-            </svg>
 
             <!-- ── LEFT BRAND PANEL (hidden on mobile) ── -->
             <div class="hidden md:flex flex-col justify-between w-[48%] max-w-xl relative overflow-hidden"
