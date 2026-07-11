@@ -250,7 +250,7 @@ function renderSidebar() {
         <aside class="w-64 sidebar-gradient text-white flex flex-col h-full hidden md:flex shadow-xl z-20">
             <div class="p-6 flex items-center gap-3 border-b border-white/10">
                 <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-lg">
-                <h1 class="font-bold text-xl tracking-tight text-white">BMH Dispatch</h1>
+                <h1 class="font-bold text-xl tracking-tight text-white">Bansal Metrial House Dispatch</h1>
             </div>
             <nav class="flex-1 px-4 py-6 space-y-1.5">
                 <div class="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-2 px-2">Workspace</div>
@@ -439,7 +439,7 @@ function renderLoginUI() {
                         <img src="/web-app-manifest-192x192.png" alt="MMC"
                              class="w-10 h-10 rounded-xl shadow-lg shadow-black/40">
                         <div>
-                            <div class="text-white font-extrabold text-lg leading-tight">BMH Dispatch</div>
+                            <div class="text-white font-extrabold text-lg leading-tight">Bansal Metrial House Dispatch</div>
                             <div class="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Dispatch OS</div>
                         </div>
                     </div>
@@ -483,7 +483,7 @@ function renderLoginUI() {
                 <div class="flex md:hidden items-center gap-2.5 mb-8">
                     <img src="/web-app-manifest-192x192.png" alt="MMC" class="w-9 h-9 rounded-xl shadow">
                     <div>
-                        <div class="text-gray-900 font-extrabold text-base leading-tight">BMH Dispatch</div>
+                        <div class="text-gray-900 font-extrabold text-base leading-tight">Bansal Metrial House Dispatch</div>
                         <div class="text-indigo-500 text-[10px] font-bold tracking-widest uppercase">Dispatch OS</div>
                     </div>
                 </div>
@@ -2040,7 +2040,7 @@ window.showMobileMoreSheet = function() {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-bold text-red-600">Log Out</div>
-                        <div class="text-xs text-gray-400 mt-0.5">Sign out of BMH Dispatch</div>
+                        <div class="text-xs text-gray-400 mt-0.5">Sign out of Bansal Metrial House Dispatch</div>
                     </div>
                 </button>
             </div>
