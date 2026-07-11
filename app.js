@@ -3754,15 +3754,9 @@ function togglePrivacyScreen_() {
     }
     const overlay = document.createElement('div');
     overlay.id = 'privacy-screen-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;';
-    overlay.innerHTML = `
-        <div style="width:48px;height:48px;border-radius:12px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;">
-            <i data-lucide="eye-off" style="width:22px;height:22px;color:#9ca3af;"></i>
-        </div>
-        <p style="font-size:13px;color:#9ca3af;font-weight:600;">Click anywhere, or press Ctrl+Shift+L again</p>`;
-    overlay.onclick = togglePrivacyScreen_;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#ffffff;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `<p style="font-size:20px;font-weight:800;color:#dc2626;letter-spacing:0.5px;">DATA BREACH DETECTED</p>`;
     document.body.appendChild(overlay);
-    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 document.addEventListener('keydown', (e) => {
