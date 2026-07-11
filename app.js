@@ -416,7 +416,66 @@ function escapeHtml(s) {
 // ==========================================
 function renderLoginUI() {
     return `
-        <div class="flex-1 flex h-full min-h-screen">
+        <div class="flex-1 flex h-full min-h-screen relative">
+
+            <!-- ── Decorative leafy branch border (left, right, bottom) ── -->
+            <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index:40;" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <defs>
+                    <g id="bmh-leaf">
+                        <ellipse cx="0" cy="0" rx="1.15" ry="0.55" fill="#4d7c3a" opacity="0.9"/>
+                    </g>
+                </defs>
+                <style>
+                    @keyframes bmhLeafSway {
+                        0%, 100% { opacity: 0.9; }
+                        50% { opacity: 0.55; }
+                    }
+                    #bmh-branch-decoration use {
+                        animation: bmhLeafSway 3.5s ease-in-out infinite;
+                        transform-box: fill-box;
+                        transform-origin: center;
+                    }
+                    #bmh-branch-decoration use:nth-child(3n) { animation-delay: 0.6s; }
+                    #bmh-branch-decoration use:nth-child(3n+1) { animation-delay: 1.3s; }
+                    #bmh-branch-decoration use:nth-child(3n+2) { animation-delay: 2.1s; }
+                </style>
+                <g id="bmh-branch-decoration">
+
+                <!-- Left branch -->
+                <path d="M 1.2 -2 C 2.5 12, 0 22, 1.8 35 C 3.2 48, 0.5 58, 1.8 72 C 2.8 84, 0.8 92, 1.5 102"
+                      fill="none" stroke="#6b4423" stroke-width="0.55" stroke-linecap="round" opacity="0.85" vector-effect="non-scaling-stroke"/>
+                <use href="#bmh-leaf" x="1.6" y="8" transform="rotate(35 1.6 8)"/>
+                <use href="#bmh-leaf" x="0.5" y="18" transform="rotate(-30 0.5 18) scale(0.9)"/>
+                <use href="#bmh-leaf" x="2.4" y="30" transform="rotate(40 2.4 30)"/>
+                <use href="#bmh-leaf" x="0.8" y="42" transform="rotate(-25 0.8 42) scale(1.1)"/>
+                <use href="#bmh-leaf" x="2.6" y="54" transform="rotate(30 2.6 54)"/>
+                <use href="#bmh-leaf" x="0.6" y="66" transform="rotate(-35 0.6 66) scale(0.95)"/>
+                <use href="#bmh-leaf" x="2.2" y="78" transform="rotate(35 2.2 78)"/>
+                <use href="#bmh-leaf" x="0.9" y="90" transform="rotate(-30 0.9 90) scale(1.05)"/>
+
+                <!-- Right branch (mirrored) -->
+                <path d="M 98.8 -2 C 97.5 12, 100 22, 98.2 35 C 96.8 48, 99.5 58, 98.2 72 C 97.2 84, 99.2 92, 98.5 102"
+                      fill="none" stroke="#6b4423" stroke-width="0.55" stroke-linecap="round" opacity="0.85" vector-effect="non-scaling-stroke"/>
+                <use href="#bmh-leaf" x="98.4" y="8" transform="rotate(-35 98.4 8) scale(-1,1)"/>
+                <use href="#bmh-leaf" x="99.5" y="18" transform="rotate(30 99.5 18) scale(-0.9,0.9)"/>
+                <use href="#bmh-leaf" x="97.6" y="30" transform="rotate(-40 97.6 30) scale(-1,1)"/>
+                <use href="#bmh-leaf" x="99.2" y="42" transform="rotate(25 99.2 42) scale(-1.1,1.1)"/>
+                <use href="#bmh-leaf" x="97.4" y="54" transform="rotate(-30 97.4 54) scale(-1,1)"/>
+                <use href="#bmh-leaf" x="99.4" y="66" transform="rotate(35 99.4 66) scale(-0.95,0.95)"/>
+                <use href="#bmh-leaf" x="97.8" y="78" transform="rotate(-35 97.8 78) scale(-1,1)"/>
+                <use href="#bmh-leaf" x="99.1" y="90" transform="rotate(30 99.1 90) scale(-1.05,1.05)"/>
+
+                <!-- Bottom branch -->
+                <path d="M -2 98.3 C 12 97, 22 99.3, 35 98 C 48 96.8, 58 99.3, 72 98 C 84 97, 92 99, 102 98.2"
+                      fill="none" stroke="#6b4423" stroke-width="0.55" stroke-linecap="round" opacity="0.85" vector-effect="non-scaling-stroke"/>
+                <use href="#bmh-leaf" x="10" y="97.5" transform="rotate(80 10 97.5)"/>
+                <use href="#bmh-leaf" x="24" y="99.2" transform="rotate(100 24 99.2) scale(0.9)"/>
+                <use href="#bmh-leaf" x="40" y="97.3" transform="rotate(75 40 97.3)"/>
+                <use href="#bmh-leaf" x="60" y="99.1" transform="rotate(105 60 99.1) scale(1.05)"/>
+                <use href="#bmh-leaf" x="76" y="97.4" transform="rotate(80 76 97.4)"/>
+                <use href="#bmh-leaf" x="90" y="98.9" transform="rotate(100 90 98.9) scale(0.95)"/>
+                </g>
+            </svg>
 
             <!-- ── LEFT BRAND PANEL (hidden on mobile) ── -->
             <div class="hidden md:flex flex-col justify-between w-[48%] max-w-xl relative overflow-hidden"
@@ -3746,8 +3805,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // use "Log Out", not this. This only guards against a passerby glancing at
 // the screen, not against someone with device access.
 // ==========================================
-
-
 let __privacyScreenActive = false;
 let __matrixRainInterval = null;
 
