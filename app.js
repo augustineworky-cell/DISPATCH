@@ -3752,17 +3752,31 @@ function showPrivacyScreen_() {
     if (!document.getElementById('privacy-screen-style')) {
         const style = document.createElement('style');
         style.id = 'privacy-screen-style';
-        style.textContent = `@keyframes privacyFlicker { 0%, 100% { opacity: 1; } 45% { opacity: 1; } 50% { opacity: 0.25; } 55% { opacity: 1; } 80% { opacity: 0.6; } }`;
+        style.textContent = `
+            @keyframes glitchText {
+                0%, 100% { text-shadow: 2px 0 #00f0ff, -2px 0 #ff0044; transform: translate(0,0); }
+                20% { text-shadow: -2px 0 #00f0ff, 2px 0 #ff0044; transform: translate(-1px,1px); }
+                40% { text-shadow: 2px 0 #00f0ff, -2px 0 #ff0044; transform: translate(1px,-1px); }
+                60% { text-shadow: -1px 0 #00f0ff, 1px 0 #ff0044; transform: translate(0,0); }
+                80% { opacity: 0.7; }
+            }
+            @keyframes skullPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } }
+        `;
         document.head.appendChild(style);
     }
 
+    const codeChars = '01{}[]<>/;=+*#%$@!?ABCDEFXYZ';
+    let bgText = '';
+    for (let i = 0; i < 400; i++) bgText += codeChars[Math.floor(Math.random() * codeChars.length)] + (i % 40 === 39 ? '\n' : ' ');
+
     const overlay = document.createElement('div');
     overlay.id = 'privacy-screen-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;font-family:"Courier New",monospace;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#000000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font-family:"Courier New",monospace;overflow:hidden;';
     overlay.innerHTML = `
-        <p style="font-size:22px;font-weight:800;color:#dc2626;letter-spacing:1px;animation:privacyFlicker 2.4s infinite;">DATA BREACH DETECTED</p>
-        <p style="font-size:11px;color:#dc2626;opacity:0.75;letter-spacing:0.5px;">UNAUTHORIZED ACCESS LOGGED · TRACE INITIATED</p>
-        <p style="font-size:11px;color:#dc2626;opacity:0.5;letter-spacing:0.5px;">SESSION FLAGGED · ${new Date().toISOString()}</p>`;
+        <pre style="position:absolute;inset:0;margin:0;color:#1a3a1a;font-size:11px;line-height:1.4;opacity:0.5;white-space:pre-wrap;word-break:break-all;padding:20px;">${bgText}</pre>
+        <div style="font-size:56px;animation:skullPulse 1.8s ease-in-out infinite;position:relative;z-index:1;">💀</div>
+        <p style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;animation:glitchText 1.4s infinite;position:relative;z-index:1;">DATA BREACH DETECTED</p>
+        <p style="font-size:11px;color:#ff0044;opacity:0.8;letter-spacing:0.5px;position:relative;z-index:1;">UNAUTHORIZED ACCESS LOGGED · TRACE INITIATED</p>`;
     document.body.appendChild(overlay);
 }
 
@@ -3771,13 +3785,12 @@ function hidePrivacyScreen_() {
 }
 
 document.addEventListener('keydown', (e) => {
-    const key = e.key.toLowerCase();
-    if (e.ctrlKey && e.shiftKey && e.altKey && key === 'l') {
-        e.preventDefault();
-        hidePrivacyScreen_();
-    } else if (e.ctrlKey && e.shiftKey && !e.altKey && key === 'l') {
+    if (e.ctrlKey && e.altKey && e.shiftKey && e.key === '9') {
         e.preventDefault();
         showPrivacyScreen_();
+    } else if (e.ctrlKey && e.altKey && e.shiftKey && e.key === '0') {
+        e.preventDefault();
+        hidePrivacyScreen_();
     }
 });
 
