@@ -3785,10 +3785,10 @@ function hidePrivacyScreen_() {
 }
 
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.altKey && e.shiftKey && e.key === '9') {
+    if (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'Digit9') {
         e.preventDefault();
         showPrivacyScreen_();
-    } else if (e.ctrlKey && e.altKey && e.shiftKey && e.key === '0') {
+    } else if (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'Digit0') {
         e.preventDefault();
         hidePrivacyScreen_();
     }
