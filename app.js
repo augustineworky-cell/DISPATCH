@@ -3746,8 +3746,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // use "Log Out", not this. This only guards against a passerby glancing at
 // the screen, not against someone with device access.
 // ==========================================
+
+
+let __privacyScreenActive = false;
+let __matrixRainInterval = null;
+
 function showPrivacyScreen_() {
     if (document.getElementById('privacy-screen-overlay')) return;
+    __privacyScreenActive = true;
+    document.activeElement?.blur();
 
     if (!document.getElementById('privacy-screen-style')) {
         const style = document.createElement('style');
@@ -3761,20 +3768,20 @@ function showPrivacyScreen_() {
 
     const now = new Date();
     const incidentId = 'INC-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
-
     const lines = [
         { tag: 'CRITICAL', color: '#ff3b3b', text: 'Unauthorized access attempt detected on this session.' },
         { tag: 'CRITICAL', color: '#ff3b3b', text: 'Session data has been flagged and isolated.' },
-        { tag: 'SYSTEM',   color: '#8a8a8a', text: `Incident ID: ${incidentId}` },
-        { tag: 'SYSTEM',   color: '#8a8a8a', text: `Timestamp: ${now.toISOString()}` },
-        { tag: 'SYSTEM',   color: '#8a8a8a', text: 'All active connections have been suspended pending review.' },
+        { tag: 'SYSTEM',   color: '#4ade80', text: `Incident ID: ${incidentId}` },
+        { tag: 'SYSTEM',   color: '#4ade80', text: `Timestamp: ${now.toISOString()}` },
+        { tag: 'SYSTEM',   color: '#4ade80', text: 'All active connections have been suspended pending review.' },
     ];
 
     const overlay = document.createElement('div');
     overlay.id = 'privacy-screen-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#0a0a0a;display:flex;align-items:center;justify-content:center;font-family:"Courier New",monospace;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#000000;display:flex;align-items:center;justify-content:center;font-family:"Courier New",monospace;overflow:hidden;';
     overlay.innerHTML = `
-        <div style="max-width:560px;width:90%;border:1px solid #2a2a2a;border-left:3px solid #ff3b3b;padding:24px 28px;background:#0d0d0d;">
+        <canvas id="matrix-rain-canvas" style="position:absolute;inset:0;"></canvas>
+        <div style="position:relative;z-index:1;max-width:560px;width:90%;border:1px solid #1a3a2a;border-left:3px solid #ff3b3b;padding:24px 28px;background:rgba(0,10,0,0.85);backdrop-filter:blur(2px);">
             ${lines.map((l, i) => `
                 <div style="opacity:0;animation:logLineIn 0.3s ease forwards;animation-delay:${i * 0.25}s;margin-bottom:8px;font-size:13px;line-height:1.5;">
                     <span style="color:${l.color};font-weight:700;">[${l.tag}]</span>
@@ -3782,24 +3789,60 @@ function showPrivacyScreen_() {
                 </div>
             `).join('')}
             <div style="margin-top:14px;font-size:13px;color:#666;">
-                <span style="color:#8a8a8a;">&gt;</span>
-                <span style="display:inline-block;width:8px;height:14px;background:#8a8a8a;animation:cursorBlink 1s step-end infinite;vertical-align:middle;margin-left:4px;"></span>
+                <span style="color:#4ade80;">&gt;</span>
+                <span style="display:inline-block;width:8px;height:14px;background:#4ade80;animation:cursorBlink 1s step-end infinite;vertical-align:middle;margin-left:4px;"></span>
             </div>
         </div>`;
     document.body.appendChild(overlay);
+
+    // Classic Matrix "digital rain" — a well-known generic technique, built
+    // fresh here with canvas, not copied from any image.
+    const canvas = document.getElementById('matrix-rain-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const fontSize = 16;
+    const columns = Math.floor(canvas.width / fontSize);
+    const drops = new Array(columns).fill(1);
+    const rainChars = 'アイウエオカキクケコサシスセソ0123456789ABCDEFXYZ';
+
+    __matrixRainInterval = setInterval(() => {
+        ctx.fillStyle = 'rgba(0,0,0,0.08)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#22c55e';
+        ctx.font = fontSize + 'px monospace';
+        for (let i = 0; i < drops.length; i++) {
+            const text = rainChars[Math.floor(Math.random() * rainChars.length)];
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        }
+    }, 50);
 }
 
 function hidePrivacyScreen_() {
     document.getElementById('privacy-screen-overlay')?.remove();
+    if (__matrixRainInterval) { clearInterval(__matrixRainInterval); __matrixRainInterval = null; }
+    __privacyScreenActive = false;
 }
 
+// Capture phase, runs before any other listener in the app — blocks every
+// key from reaching the page underneath while the screen is active, except
+// the disable combo itself.
 document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'Digit9') {
         e.preventDefault();
         showPrivacyScreen_();
-    } else if (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'Digit0') {
+        return;
+    }
+    if (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'Digit0') {
         e.preventDefault();
         hidePrivacyScreen_();
+        return;
     }
-});
+    if (__privacyScreenActive) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    }
+}, true);
 
