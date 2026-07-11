@@ -3746,23 +3746,38 @@ document.addEventListener('DOMContentLoaded', () => {
 // use "Log Out", not this. This only guards against a passerby glancing at
 // the screen, not against someone with device access.
 // ==========================================
-function togglePrivacyScreen_() {
-    const existing = document.getElementById('privacy-screen-overlay');
-    if (existing) {
-        existing.remove();
-        return;
+function showPrivacyScreen_() {
+    if (document.getElementById('privacy-screen-overlay')) return;
+
+    if (!document.getElementById('privacy-screen-style')) {
+        const style = document.createElement('style');
+        style.id = 'privacy-screen-style';
+        style.textContent = `@keyframes privacyFlicker { 0%, 100% { opacity: 1; } 45% { opacity: 1; } 50% { opacity: 0.25; } 55% { opacity: 1; } 80% { opacity: 0.6; } }`;
+        document.head.appendChild(style);
     }
+
     const overlay = document.createElement('div');
     overlay.id = 'privacy-screen-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#ffffff;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = `<p style="font-size:20px;font-weight:800;color:#dc2626;letter-spacing:0.5px;">DATA BREACH DETECTED</p>`;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#ffffff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;font-family:"Courier New",monospace;';
+    overlay.innerHTML = `
+        <p style="font-size:22px;font-weight:800;color:#dc2626;letter-spacing:1px;animation:privacyFlicker 2.4s infinite;">DATA BREACH DETECTED</p>
+        <p style="font-size:11px;color:#dc2626;opacity:0.75;letter-spacing:0.5px;">UNAUTHORIZED ACCESS LOGGED · TRACE INITIATED</p>
+        <p style="font-size:11px;color:#dc2626;opacity:0.5;letter-spacing:0.5px;">SESSION FLAGGED · ${new Date().toISOString()}</p>`;
     document.body.appendChild(overlay);
 }
 
+function hidePrivacyScreen_() {
+    document.getElementById('privacy-screen-overlay')?.remove();
+}
+
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
+    const key = e.key.toLowerCase();
+    if (e.ctrlKey && e.shiftKey && e.altKey && key === 'l') {
         e.preventDefault();
-        togglePrivacyScreen_();
+        hidePrivacyScreen_();
+    } else if (e.ctrlKey && e.shiftKey && !e.altKey && key === 'l') {
+        e.preventDefault();
+        showPrivacyScreen_();
     }
 });
 
