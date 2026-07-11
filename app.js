@@ -3737,3 +3737,38 @@ function addAutoRefreshIndicator() {
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(addAutoRefreshIndicator, 3000);
 });
+
+// ==========================================
+// PRIVACY SCREEN — Ctrl+Shift+L blanks the screen instantly
+// Quick visual privacy shield if someone walks up while you're working.
+// Not a security boundary (this is just a visual overlay, not a real lock —
+// the actual account session stays active underneath) — for real protection
+// use "Log Out", not this. This only guards against a passerby glancing at
+// the screen, not against someone with device access.
+// ==========================================
+function togglePrivacyScreen_() {
+    const existing = document.getElementById('privacy-screen-overlay');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    const overlay = document.createElement('div');
+    overlay.id = 'privacy-screen-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;';
+    overlay.innerHTML = `
+        <div style="width:48px;height:48px;border-radius:12px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="eye-off" style="width:22px;height:22px;color:#9ca3af;"></i>
+        </div>
+        <p style="font-size:13px;color:#9ca3af;font-weight:600;">Click anywhere, or press Ctrl+Shift+L again</p>`;
+    overlay.onclick = togglePrivacyScreen_;
+    document.body.appendChild(overlay);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        togglePrivacyScreen_();
+    }
+});
+
