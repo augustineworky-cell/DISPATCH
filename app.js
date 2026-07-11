@@ -3753,30 +3753,39 @@ function showPrivacyScreen_() {
         const style = document.createElement('style');
         style.id = 'privacy-screen-style';
         style.textContent = `
-            @keyframes glitchText {
-                0%, 100% { text-shadow: 2px 0 #00f0ff, -2px 0 #ff0044; transform: translate(0,0); }
-                20% { text-shadow: -2px 0 #00f0ff, 2px 0 #ff0044; transform: translate(-1px,1px); }
-                40% { text-shadow: 2px 0 #00f0ff, -2px 0 #ff0044; transform: translate(1px,-1px); }
-                60% { text-shadow: -1px 0 #00f0ff, 1px 0 #ff0044; transform: translate(0,0); }
-                80% { opacity: 0.7; }
-            }
-            @keyframes skullPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } }
+            @keyframes cursorBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+            @keyframes logLineIn { from { opacity: 0; } to { opacity: 1; } }
         `;
         document.head.appendChild(style);
     }
 
-    const codeChars = '01{}[]<>/;=+*#%$@!?ABCDEFXYZ';
-    let bgText = '';
-    for (let i = 0; i < 400; i++) bgText += codeChars[Math.floor(Math.random() * codeChars.length)] + (i % 40 === 39 ? '\n' : ' ');
+    const now = new Date();
+    const incidentId = 'INC-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
+
+    const lines = [
+        { tag: 'CRITICAL', color: '#ff3b3b', text: 'Unauthorized access attempt detected on this session.' },
+        { tag: 'CRITICAL', color: '#ff3b3b', text: 'Session data has been flagged and isolated.' },
+        { tag: 'SYSTEM',   color: '#8a8a8a', text: `Incident ID: ${incidentId}` },
+        { tag: 'SYSTEM',   color: '#8a8a8a', text: `Timestamp: ${now.toISOString()}` },
+        { tag: 'SYSTEM',   color: '#8a8a8a', text: 'All active connections have been suspended pending review.' },
+    ];
 
     const overlay = document.createElement('div');
     overlay.id = 'privacy-screen-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#000000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font-family:"Courier New",monospace;overflow:hidden;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#0a0a0a;display:flex;align-items:center;justify-content:center;font-family:"Courier New",monospace;';
     overlay.innerHTML = `
-        <pre style="position:absolute;inset:0;margin:0;color:#1a3a1a;font-size:11px;line-height:1.4;opacity:0.5;white-space:pre-wrap;word-break:break-all;padding:20px;">${bgText}</pre>
-        <div style="font-size:56px;animation:skullPulse 1.8s ease-in-out infinite;position:relative;z-index:1;">💀</div>
-        <p style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;animation:glitchText 1.4s infinite;position:relative;z-index:1;">DATA BREACH DETECTED</p>
-        <p style="font-size:11px;color:#ff0044;opacity:0.8;letter-spacing:0.5px;position:relative;z-index:1;">UNAUTHORIZED ACCESS LOGGED · TRACE INITIATED</p>`;
+        <div style="max-width:560px;width:90%;border:1px solid #2a2a2a;border-left:3px solid #ff3b3b;padding:24px 28px;background:#0d0d0d;">
+            ${lines.map((l, i) => `
+                <div style="opacity:0;animation:logLineIn 0.3s ease forwards;animation-delay:${i * 0.25}s;margin-bottom:8px;font-size:13px;line-height:1.5;">
+                    <span style="color:${l.color};font-weight:700;">[${l.tag}]</span>
+                    <span style="color:#d4d4d4;"> ${l.text}</span>
+                </div>
+            `).join('')}
+            <div style="margin-top:14px;font-size:13px;color:#666;">
+                <span style="color:#8a8a8a;">&gt;</span>
+                <span style="display:inline-block;width:8px;height:14px;background:#8a8a8a;animation:cursorBlink 1s step-end infinite;vertical-align:middle;margin-left:4px;"></span>
+            </div>
+        </div>`;
     document.body.appendChild(overlay);
 }
 
