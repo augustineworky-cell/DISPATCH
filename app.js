@@ -58,6 +58,12 @@ function stepName(code) {
     return stepLabels[code]?.en || code;
 }
 
+function paymentTermBadge(term) {
+    if (term === 'ADVANCE') return `<span class="text-[10px] font-bold px-2 py-1 rounded uppercase bg-emerald-100 text-emerald-700">✓ Paid</span>`;
+    if (term === 'CREDIT') return `<span class="text-[10px] font-bold px-2 py-1 rounded uppercase bg-amber-100 text-amber-700">Credit</span>`;
+    return `<span class="text-gray-300">—</span>`;
+}
+
 // Real global mobile-detection function — PullToRefresh.init() calls this.
 // (Pre-existing bug in the original file: isMobile was only ever a local
 // variable computed inline elsewhere, never a real function, so this call
@@ -227,6 +233,7 @@ async function router() {
                 await renderPackingAssignment(main);
             }
         }
+        else if (hash === '#/payment-status') await renderPaymentStatus(main);
         else if (hash === '#/mobile') await renderMobileHome(main);
         else if (hash === '#/mobile/orders') await renderMobileOrders(main);
         else if (hash === '#/mobile/packing-queue') await renderPackingQueueMobile(main);
@@ -260,6 +267,7 @@ function renderSidebar() {
                 ${navItem('#/customers', 'users', 'Customers', path.includes('customers'))}
                 ${navItem('#/analytics', 'bar-chart-3', 'Analytics', path.includes('analytics'))}
                 ${['admin', 'manager'].includes(currentUser?.role) ? navItem('#/packing-assignment', 'clipboard-list', 'Packing Assignment', path.includes('packing-assignment')) : ''}
+                ${navItem('#/payment-status', 'banknote', 'Payment Status', path.includes('payment-status'))}
             </nav>
             <div class="p-4 bg-black/20 backdrop-blur-sm m-4 rounded-xl border border-white/10">
                 <div class="flex items-center gap-3">
@@ -830,6 +838,7 @@ async function renderOrders(container) {
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Value</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Dispatch Mode</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Referred By</th>
+                            <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Payment Term</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Current Step</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">${t('status')}</th>
                         </tr>
@@ -889,11 +898,13 @@ async function renderNewOrder(container) {
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">State</label>
-                            <select id="no_state" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <select id="no_state" onchange="handleStateChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                                 <option value="" disabled selected>Select state...</option>
                                 ${['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Chandigarh','Puducherry']
                                     .map(s => `<option value="${s}">${s}</option>`).join('')}
+                                <option value="__OTHER__">+ Other (type state)</option>
                             </select>
+                            <input type="text" id="no_state_custom" placeholder="Enter state name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Payment Type *</label>
@@ -929,6 +940,14 @@ async function renderNewOrder(container) {
                                 <option value="__OTHER__">+ Others (type name)</option>
                             </select>
                             <input type="text" id="no_sales_custom" placeholder="Enter name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Payment Term *</label>
+                            <select id="no_payment_term" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="" disabled selected>Select payment term...</option>
+                                <option value="ADVANCE">ADVANCE</option>
+                                <option value="CREDIT">CREDIT</option>
+                            </select>
                         </div>
                         <div class="col-span-2">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Performa Invoice / Order Document (optional)</label>
@@ -1554,6 +1573,11 @@ window.handleCreateOrder = async function(e) {
             ? document.getElementById('no_city_custom').value.trim()
             : cityEl.value;
 
+        const stateEl = document.getElementById('no_state');
+        const stateInput = stateEl.value === '__OTHER__'
+            ? document.getElementById('no_state_custom').value.trim()
+            : stateEl.value;
+
         const newOrder = await window.db.createOrder({
             organizationId: currentOrgId,
             customerId: customerId,
@@ -1562,13 +1586,14 @@ window.handleCreateOrder = async function(e) {
             customerPhone2: customerPhone2Input,
             contactPerson: document.getElementById('no_contact_person').value.trim() || null,
             city: cityInput || null,
-            state: document.getElementById('no_state').value || null,
+            state: stateInput || null,
             paymentType: paymentTypeInput,
             bankName: bankNameInput,
             dispatchMode: document.getElementById('no_mode').value,
             salesPersonName: salesEl.value === '__OTHER__'
                 ? document.getElementById('no_sales_custom').value.trim()
                 : salesEl.value,
+            paymentTerm: document.getElementById('no_payment_term').value,
             orderValue: null   // BMH's process doesn't track this — schema column stays nullable
         });
 
@@ -2796,7 +2821,7 @@ function renderOrderRows(orders) {
     const tbody = document.getElementById('orders-tbody');
     if (!tbody) return;
     if (orders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-400 text-sm">No orders match your filters</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-400 text-sm">No orders match your filters</td></tr>`;
         return;
     }
     tbody.innerHTML = orders.map((o, i) => `
@@ -2808,6 +2833,7 @@ function renderOrderRows(orders) {
             <td class="px-6 py-3.5 font-medium text-gray-700 font-mono">₹${formatINR(o.order_value)}</td>
             <td class="px-6 py-3.5"><span class="text-[10px] font-bold px-2 py-1 rounded uppercase ${o.dispatch_mode === 'PORTER' ? 'bg-blue-100 text-blue-700' : o.dispatch_mode === 'SELF' ? 'bg-green-100 text-green-700' : o.dispatch_mode === 'DTDC' || o.dispatch_mode === 'TRACKON' ? 'bg-purple-100 text-purple-700' : o.dispatch_mode === 'CARGO' || o.dispatch_mode === 'BUS' ? 'bg-orange-100 text-orange-700' : o.dispatch_mode === 'DELIVERY' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}">${o.dispatch_mode || '—'}</span></td>
             <td class="px-6 py-3.5"><span class="text-xs font-bold ${(o.sales_person_name || o.sales_person) ? 'text-indigo-700 bg-indigo-50 px-2 py-1 rounded' : 'text-gray-400'}">${o.sales_person_name || o.sales_person || 'N/A'}</span></td>
+            <td class="px-6 py-3.5">${paymentTermBadge(o.payment_term)}</td>
             <td class="px-6 py-3.5"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
             <td class="px-6 py-3.5">
                 ${o.is_cancelled ? `<span class="px-2.5 py-1 bg-gray-200 text-gray-700 text-[10px] font-bold rounded uppercase">✕ Cancelled</span>`
@@ -2992,6 +3018,17 @@ window.handleStepPaymentTypeChange = function(selectEl) {
 
 window.handleCityChange = function(selectEl) {
     const customInput = document.getElementById('no_city_custom');
+    if (selectEl.value === '__OTHER__') {
+        customInput.style.display = 'block';
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+    }
+};
+
+window.handleStateChange = function(selectEl) {
+    const customInput = document.getElementById('no_state_custom');
     if (selectEl.value === '__OTHER__') {
         customInput.style.display = 'block';
         customInput.focus();
@@ -3327,6 +3364,76 @@ window.handlePackerAssign = async function(orderId, packerName, priority) {
         showToast(err.message, 'error');
     }
 };
+
+// ==========================================
+// PAYMENT STATUS
+// ==========================================
+async function renderPaymentStatus(container) {
+    container.innerHTML = renderLoadingState();
+    let orders;
+    try {
+        orders = await window.db.getOrdersByPaymentTerm();
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="max-w-2xl mx-auto mt-10 p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <p class="font-bold mb-1">Couldn't load payment status</p>
+            <p>${escapeHtml(err.message || 'Unknown error')}</p>
+        </div>`;
+        return;
+    }
+
+    const advance = orders.filter(o => o.payment_term === 'ADVANCE')
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const credit = orders.filter(o => o.payment_term === 'CREDIT')
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const renderTable = (list) => `
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            ${list.length === 0 ? `<div class="p-8 text-center text-gray-400 text-sm">No orders here.</div>` : `
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
+                    <tr>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">${t('order_code')}</th>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Customer</th>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">City</th>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">State</th>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Referred By</th>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Current Step</th>
+                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Payment Term</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    ${list.map(o => `
+                        <tr class="hover:bg-indigo-50/50 cursor-pointer" onclick="openOrderDrawer('${o.id}')">
+                            <td class="px-5 py-3 font-mono text-indigo-600 font-bold">${o.order_code}</td>
+                            <td class="px-5 py-3 font-semibold text-gray-900">${escapeHtml(o.customer_name)}</td>
+                            <td class="px-5 py-3 text-gray-700">${escapeHtml(o.city) || '—'}</td>
+                            <td class="px-5 py-3 text-gray-700">${escapeHtml(o.state) || '—'}</td>
+                            <td class="px-5 py-3 text-gray-700">${escapeHtml(o.sales_person_name) || '—'}</td>
+                            <td class="px-5 py-3"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
+                            <td class="px-5 py-3">${paymentTermBadge(o.payment_term)}</td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>`}
+        </div>`;
+
+    container.innerHTML = `
+        <div class="max-w-5xl mx-auto animate-in space-y-8">
+            <div>
+                <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Payment Status</h2>
+                <p class="text-sm text-gray-500 mt-1">Paid (advance) orders should be prioritized for packing/dispatch over credit orders.</p>
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Paid — Ready to Prioritize <span class="text-gray-400 font-medium normal-case">(${advance.length})</span></h3>
+                ${renderTable(advance)}
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Credit — Pending Payment <span class="text-gray-400 font-medium normal-case">(${credit.length})</span></h3>
+                ${renderTable(credit)}
+            </div>
+        </div>`;
+    lucide.createIcons();
+}
 
 // ==========================================
 // PACKING QUEUE (mobile, Blinkit-style accept + checklist)

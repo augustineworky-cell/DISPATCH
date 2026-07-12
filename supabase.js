@@ -293,7 +293,7 @@ window.db = {
 
     async createOrder({
         organizationId, customerId, customerName, customerPhone, customerPhone2, contactPerson,
-        city, state, paymentType, bankName, dispatchMode, salesPersonName, orderValue
+        city, state, paymentType, bankName, dispatchMode, salesPersonName, orderValue, paymentTerm
     }) {
         const { data, error } = await supabaseClient.rpc('create_order', {
             p_organization_id: organizationId,
@@ -308,7 +308,8 @@ window.db = {
             p_bank_name: bankName || null,
             p_dispatch_mode: dispatchMode,
             p_sales_person_name: salesPersonName || null,
-            p_order_value: orderValue ?? null
+            p_order_value: orderValue ?? null,
+            p_payment_term: paymentTerm || null
         });
         if (error) throw error;
         return data;
@@ -359,6 +360,20 @@ window.db = {
             .eq('is_deleted', false).eq('is_cancelled', false)
             .order('packing_priority', { ascending: true, nullsFirst: false });
         if (error) { console.error('getOrdersForPackingAssignment:', error); throw error; }
+        return data || [];
+    },
+
+    // ─── PAYMENT STATUS ───
+    // Active orders with a payment_term set, for the Payment Status page —
+    // split into ADVANCE ("paid, prioritize") vs CREDIT ("pending") client-side.
+    async getOrdersByPaymentTerm() {
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('is_deleted', false).eq('is_cancelled', false).eq('is_completed', false)
+            .not('payment_term', 'is', null)
+            .order('created_at', { ascending: true });
+        if (error) { console.error('getOrdersByPaymentTerm:', error); throw error; }
         return data || [];
     },
 
