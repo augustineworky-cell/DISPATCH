@@ -1,7 +1,7 @@
 {
-  "name": "Bansal Metrial House Dispatch",
+  "name": "Bansal Material House Dispatch",
   "short_name": "BMH Dispatch",
-  "description": "Bansal Metrial House Dispatch Management System",
+  "description": "Bansal Material House Dispatch Management System",
   "start_url": "/#/mobile/orders",
   "display": "standalone",
   "background_color": "#ffffff",

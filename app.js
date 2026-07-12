@@ -249,8 +249,8 @@ function renderSidebar() {
     return `
         <aside class="w-64 sidebar-gradient text-white flex flex-col h-full hidden md:flex shadow-xl z-20">
             <div class="p-6 flex items-center gap-3 border-b border-white/10">
-                <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-lg">
-                <h1 class="font-bold text-xl tracking-tight text-white">Bansal Metrial House Dispatch</h1>
+                <img src="/web-app-manifest-192x192.png" alt="Bansal Material House" class="w-10 h-10 rounded-lg">
+                <h1 class="font-bold text-xl tracking-tight text-white">Bansal Material House Dispatch</h1>
             </div>
             <nav class="flex-1 px-4 py-6 space-y-1.5">
                 <div class="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-2 px-2">Workspace</div>
@@ -439,7 +439,7 @@ function renderLoginUI() {
                         <img src="/web-app-manifest-192x192.png" alt="MMC"
                              class="w-10 h-10 rounded-xl shadow-lg shadow-black/40">
                         <div>
-                            <div class="text-white font-extrabold text-lg leading-tight">Bansal Metrial House Dispatch</div>
+                            <div class="text-white font-extrabold text-lg leading-tight">Bansal Material House Dispatch</div>
                             <div class="text-indigo-300 text-xs font-semibold tracking-widest uppercase">Dispatch OS</div>
                         </div>
                     </div>
@@ -472,7 +472,7 @@ function renderLoginUI() {
                 </div>
 
                 <div class="relative z-10 px-10 pb-8 text-indigo-400/50 text-xs">
-                    © ${new Date().getFullYear()} Bansal Metrial House · All rights reserved
+                    © ${new Date().getFullYear()} Bansal Material House · All rights reserved
                 </div>
             </div>
 
@@ -483,7 +483,7 @@ function renderLoginUI() {
                 <div class="flex md:hidden items-center gap-2.5 mb-8">
                     <img src="/web-app-manifest-192x192.png" alt="MMC" class="w-9 h-9 rounded-xl shadow">
                     <div>
-                        <div class="text-gray-900 font-extrabold text-base leading-tight">Bansal Metrial House Dispatch</div>
+                        <div class="text-gray-900 font-extrabold text-base leading-tight">Bansal Material House Dispatch</div>
                         <div class="text-indigo-500 text-[10px] font-bold tracking-widest uppercase">Dispatch OS</div>
                     </div>
                 </div>
@@ -829,7 +829,7 @@ async function renderOrders(container) {
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">${t('customer')}</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Value</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Dispatch Mode</th>
-                            <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Sales Person</th>
+                            <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Referred By</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Current Step</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">${t('status')}</th>
                         </tr>
@@ -918,7 +918,7 @@ async function renderNewOrder(container) {
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Order Taken Through *</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Order Referred By *</label>
                             <select id="no_sales" required onchange="handleSalesChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                                 <option value="" disabled selected>Select source...</option>
                                 <option value="Meena Bansal">Meena Bansal</option>
@@ -1065,7 +1065,7 @@ function renderDrawerContent(order, steps, nextStep, subMap) {
                         <div class="text-sm font-bold text-gray-900 mt-1">${order.order_date ? new Date(order.order_date).toLocaleDateString() : '—'}</div>
                     </div>
                     <div>
-                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Sales Person</div>
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Order Referred By</div>
                         <div class="text-sm font-bold text-gray-900 mt-1">${order.sales_person_name || '—'}</div>
                     </div>
                     <div>
@@ -1370,22 +1370,22 @@ window.openStepModal = function(orderId, stepCode) {
                 <input type="number" step="0.01" id="form-weight" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">No. of Cartons</label>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Nag Kitne Hai (No. of Cartons)</label>
                 <input type="number" id="form-cartons" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
             </div>
         </div>
         <div class="flex flex-wrap gap-3 mb-3">
-            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-quality"> Quality check</label>
+            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-quality"> Quantity check</label>
             <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-label"> Labelling correct</label>
             <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-marka"> Private marka</label>
         </div>
         <div class="grid grid-cols-2 gap-2.5 mb-3">
             <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Photo before packing</label>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Maal Pack Hone Se Pehle Ki Photo</label>
                 <input type="file" id="form-photo-before" accept="image/*" required class="w-full text-xs">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Photo after packing</label>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Maal Pack Hone Ke Baad Ki Photo</label>
                 <input type="file" id="form-photo-after" accept="image/*" required class="w-full text-xs">
             </div>
         </div>
@@ -1721,7 +1721,7 @@ async function renderMobileOrders(container, filter = 'all') {
                 <div class="px-4 pt-4 pb-5">
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-2.5">
-                            <img src="/web-app-manifest-192x192.png" alt="Bansal Metrial House" class="w-10 h-10 rounded-xl shadow-md">
+                            <img src="/web-app-manifest-192x192.png" alt="Bansal Material House" class="w-10 h-10 rounded-xl shadow-md">
                             <div>
                                 <h1 class="font-extrabold text-lg leading-tight tracking-tight">BMH Dispatch</h1>
                                 <p class="text-[11px] text-white/70 font-medium">Hi, ${currentUser?.full_name?.split(' ')[0] || 'there'} 👋</p>
@@ -2040,7 +2040,7 @@ window.showMobileMoreSheet = function() {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-bold text-red-600">Log Out</div>
-                        <div class="text-xs text-gray-400 mt-0.5">Sign out of Bansal Metrial House Dispatch</div>
+                        <div class="text-xs text-gray-400 mt-0.5">Sign out of Bansal Material House Dispatch</div>
                     </div>
                 </button>
             </div>
@@ -3420,22 +3420,22 @@ function renderPackingChecklistCard(o) {
                         <input type="number" step="0.01" id="pk-weight-${o.id}" required class="w-full border rounded-lg p-2 text-sm mt-0.5">
                     </div>
                     <div>
-                        <label class="text-[11px] font-bold text-gray-500">No. of Cartons</label>
+                        <label class="text-[11px] font-bold text-gray-500">Nag Kitne Hai (No. of Cartons)</label>
                         <input type="number" id="pk-cartons-${o.id}" required class="w-full border rounded-lg p-2 text-sm mt-0.5">
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-3 pt-1">
-                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-quality-${o.id}"> Quality check</label>
+                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-quality-${o.id}"> Quantity check</label>
                     <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-label-${o.id}"> Labelling correct</label>
                     <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-marka-${o.id}"> Private marka</label>
                 </div>
                 <div class="grid grid-cols-2 gap-2.5 pt-1">
                     <div>
-                        <label class="text-[11px] font-bold text-gray-500">Photo before packing</label>
+                        <label class="text-[11px] font-bold text-gray-500">Maal Pack Hone Se Pehle Ki Photo</label>
                         <input type="file" id="pk-photo-before-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
                     </div>
                     <div>
-                        <label class="text-[11px] font-bold text-gray-500">Photo after packing</label>
+                        <label class="text-[11px] font-bold text-gray-500">Maal Pack Hone Ke Baad Ki Photo</label>
                         <input type="file" id="pk-photo-after-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
                     </div>
                 </div>
