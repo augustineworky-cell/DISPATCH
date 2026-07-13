@@ -227,7 +227,7 @@ async function router() {
         else if (hash === '#/customers') await renderCustomers(main);
         else if (hash === '#/analytics') await renderAnalytics(main);
         else if (hash === '#/packing-assignment') {
-            if (!['admin', 'manager'].includes(currentUser?.role)) {
+            if (!['admin', 'manager', 'crm'].includes(currentUser?.role)) {
                 main.innerHTML = '<div class="p-8 text-center text-gray-500">You don\'t have access to this page.</div>';
             } else {
                 await renderPackingAssignment(main);
@@ -271,7 +271,7 @@ function renderSidebar() {
                 ${navItem('#/orders', 'shopping-cart', t('orders'), path.includes('orders') && !path.includes('new'))}
                 ${navItem('#/customers', 'users', 'Customers', path.includes('customers'))}
                 ${navItem('#/analytics', 'bar-chart-3', 'Analytics', path.includes('analytics'))}
-                ${['admin', 'manager'].includes(currentUser?.role) ? navItem('#/packing-assignment', 'clipboard-list', 'Packing Assignment', path.includes('packing-assignment')) : ''}
+                ${['admin', 'manager', 'crm'].includes(currentUser?.role) ? navItem('#/packing-assignment', 'clipboard-list', 'Packing Assignment', path.includes('packing-assignment')) : ''}
                 ${navItem('#/rickshaw-dispatch', 'bike', 'Rickshaw Dispatch', path.includes('rickshaw-dispatch'))}
                 ${navItem('#/payment-status', 'banknote', 'Payment Status', path.includes('payment-status'))}
             </nav>
@@ -3440,7 +3440,7 @@ function renderRickshawOrderRow(o, tint) {
                     placeholder="e.g. Slot 1 / Morning trip"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="w-56 flex-shrink-0 flex items-center gap-1.5">
+            <div class="w-56 flex-shrink-0 flex items-center gap-1.5 sticky right-0 z-10 border-l border-gray-200 pl-2 -mr-5 pr-5 ${tint ? tint.bg : 'bg-white'}">
                 <button onclick="handleRickshawAssign('${o.id}')" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition flex-shrink-0">
                     <i data-lucide="save" class="w-3 h-3"></i> Save
                 </button>
@@ -3523,7 +3523,7 @@ async function renderRickshawDispatch(container) {
             <div class="w-36 flex-shrink-0">Rickshaw Wala</div>
             <div class="flex-1 min-w-[160px]">Location</div>
             <div class="flex-1 min-w-[160px]">Slot</div>
-            <div class="w-56 flex-shrink-0">Actions</div>
+            <div class="w-56 flex-shrink-0 sticky right-0 z-10 bg-gray-100 border-l border-gray-200 pl-2 -mr-5 pr-5">Actions</div>
         </div>`;
 
     const unassignedSection = unassigned.length ? `
