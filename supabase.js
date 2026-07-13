@@ -385,6 +385,26 @@ window.db = {
         if (error) throw error;
     },
 
+    // ─── RICKSHAW DISPATCH ───
+    // Active orders, for the rickshaw driver/handoff assignment page.
+    async getOrdersForRickshawDispatch() {
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('is_deleted', false).eq('is_cancelled', false).eq('is_completed', false)
+            .order('created_at', { ascending: true });
+        if (error) { console.error('getOrdersForRickshawDispatch:', error); throw error; }
+        return data || [];
+    },
+
+    async assignRickshawTrip(orderId, rickshawWala, location, slot) {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({ rickshaw_wala: rickshawWala || null, rickshaw_location: location || null, rickshaw_slot: slot || null })
+            .eq('id', orderId);
+        if (error) throw error;
+    },
+
     // Mobile packing queue: assigned + not yet accepted, sorted by priority.
     async getPackingQueue() {
         const { data, error } = await supabaseClient

@@ -175,7 +175,7 @@ function refreshCurrentView_() {
         renderMobileOrders(document.getElementById('main-content'));
     } else if (hash === '#/mobile/packing-queue') {
         renderPackingQueueMobile(document.getElementById('main-content'));
-    } else if (['#/orders', '#/dashboard', '#/board', '#/packing-assignment'].includes(hash)) {
+    } else if (['#/orders', '#/dashboard', '#/board', '#/packing-assignment', '#/rickshaw-dispatch'].includes(hash)) {
         router();
     }
 }
@@ -233,6 +233,7 @@ async function router() {
                 await renderPackingAssignment(main);
             }
         }
+        else if (hash === '#/rickshaw-dispatch') await renderRickshawDispatch(main);
         else if (hash === '#/payment-status') await renderPaymentStatus(main);
         else if (hash === '#/mobile') await renderMobileHome(main);
         else if (hash === '#/mobile/orders') await renderMobileOrders(main);
@@ -249,17 +250,21 @@ async function router() {
 function renderSidebar() {
     const path = location.hash || '#/dashboard';
     const navItem = (href, icon, label, isActive) => `
-        <a href="${href}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors ${isActive ? 'bg-indigo-600 shadow-md text-white' : 'text-indigo-100'}">
+        <a href="${href}" onclick="closeSidebarMobile()" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors ${isActive ? 'bg-indigo-600 shadow-md text-white' : 'text-indigo-100'}">
             <i data-lucide="${icon}" class="w-5 h-5"></i> ${label}
         </a>`;
-        
+
     return `
-        <aside class="w-64 sidebar-gradient text-white flex flex-col h-full hidden md:flex shadow-xl z-20">
-            <div class="p-6 flex items-center gap-3 border-b border-white/10">
-                <img src="/web-app-manifest-192x192.png" alt="Bansal Material House" class="w-10 h-10 rounded-lg">
-                <h1 class="font-bold text-xl tracking-tight text-white">Bansal Material House Dispatch</h1>
+        <div id="sidebar-backdrop" class="hidden md:hidden fixed inset-0 bg-black/40 z-30" onclick="closeSidebarMobile()"></div>
+        <aside id="app-sidebar" class="w-64 sidebar-gradient text-white flex flex-col h-full shadow-xl z-40 fixed md:static inset-y-0 left-0 -translate-x-full md:translate-x-0 transition-transform duration-200 ease-out">
+            <div class="p-4 sm:p-6 flex items-center gap-3 border-b border-white/10">
+                <img src="/web-app-manifest-192x192.png" alt="Bansal Material House" class="w-10 h-10 rounded-lg flex-shrink-0">
+                <h1 class="font-bold text-lg sm:text-xl tracking-tight text-white leading-tight">Bansal Material House Dispatch</h1>
+                <button onclick="closeSidebarMobile()" class="md:hidden ml-auto flex-shrink-0 text-white/60 hover:text-white p-1 -mr-1" aria-label="Close menu">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
             </div>
-            <nav class="flex-1 px-4 py-6 space-y-1.5">
+            <nav class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
                 <div class="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-2 px-2">Workspace</div>
                 ${navItem('#/dashboard', 'layout-dashboard', t('dashboard'), path.includes('dashboard'))}
                 ${navItem('#/board', 'kanban', t('kanban'), path.includes('/board'))}
@@ -267,11 +272,12 @@ function renderSidebar() {
                 ${navItem('#/customers', 'users', 'Customers', path.includes('customers'))}
                 ${navItem('#/analytics', 'bar-chart-3', 'Analytics', path.includes('analytics'))}
                 ${['admin', 'manager'].includes(currentUser?.role) ? navItem('#/packing-assignment', 'clipboard-list', 'Packing Assignment', path.includes('packing-assignment')) : ''}
+                ${navItem('#/rickshaw-dispatch', 'bike', 'Rickshaw Dispatch', path.includes('rickshaw-dispatch'))}
                 ${navItem('#/payment-status', 'banknote', 'Payment Status', path.includes('payment-status'))}
             </nav>
             <div class="p-4 bg-black/20 backdrop-blur-sm m-4 rounded-xl border border-white/10">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner" style="background-color: ${currentUser?.avatar_color || '#4f46e5'}">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner flex-shrink-0" style="background-color: ${currentUser?.avatar_color || '#4f46e5'}">
                         ${currentUser?.full_name?.substring(0,2).toUpperCase() || 'U'}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -284,12 +290,34 @@ function renderSidebar() {
         </aside>`;
 }
 
+// Sidebar is fixed+off-canvas below md (768px) so it works as a "desktop
+// mode" overlay drawer on iPhone/iPad instead of the old `hidden md:flex`,
+// which made it disappear entirely on narrow forced-desktop screens.
+window.toggleSidebarMobile = function() {
+    const aside = document.getElementById('app-sidebar');
+    if (!aside) return;
+    aside.classList.contains('translate-x-0') ? closeSidebarMobile() : openSidebarMobile();
+};
+
+window.openSidebarMobile = function() {
+    document.getElementById('app-sidebar')?.classList.replace('-translate-x-full', 'translate-x-0');
+    document.getElementById('sidebar-backdrop')?.classList.remove('hidden');
+};
+
+window.closeSidebarMobile = function() {
+    document.getElementById('app-sidebar')?.classList.replace('translate-x-0', '-translate-x-full');
+    document.getElementById('sidebar-backdrop')?.classList.add('hidden');
+};
+
 function renderTopbar() {
     const lang = localStorage.getItem('mmc_lang') || 'en';
     return `
-        <header class="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-            <div class="flex items-center gap-4 flex-1">
-                <div class="relative w-64 md:w-96">
+        <header class="min-h-16 bg-white border-b border-gray-200 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4 sticky top-0 z-10 shadow-sm">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <button onclick="toggleSidebarMobile()" class="md:hidden flex-shrink-0 -ml-1 p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition" aria-label="Open menu">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+                <div class="relative flex-1 min-w-[120px] sm:w-64 sm:flex-none md:w-96">
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
                     <input type="text" id="global-search" placeholder="${t('search_placeholder')}"
                            oninput="handleGlobalSearch(event)"
@@ -299,11 +327,11 @@ function renderTopbar() {
                     <div id="search-dropdown" class="hidden absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-96 overflow-y-auto z-50"></div>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
-                <button onclick="toggleLanguage()" class="px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-sm font-semibold hover:bg-gray-200 transition">
+            <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <button onclick="toggleLanguage()" class="px-2.5 sm:px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-xs sm:text-sm font-semibold hover:bg-gray-200 transition">
                     ${lang === 'hi' ? 'EN' : 'हिंदी'}
                 </button>
-                <a href="#/orders/new" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all hover:-translate-y-0.5">
+                <a href="#/orders/new" class="bg-indigo-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-600/20 flex items-center gap-1.5 sm:gap-2 transition-all hover:-translate-y-0.5 whitespace-nowrap">
                     <i data-lucide="plus" class="w-4 h-4"></i> ${t('new_order')}
                 </a>
             </div>
@@ -3314,6 +3342,8 @@ async function renderPackingAssignment(container) {
                 <p class="text-sm text-gray-500 mt-1">Assign a packer and set priority for orders approaching the packing stage.</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                <div class="min-w-[640px]">
                 <div class="grid grid-cols-12 gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                     <div class="col-span-3">Order</div>
                     <div class="col-span-3">Customer</div>
@@ -3352,6 +3382,8 @@ async function renderPackingAssignment(container) {
                         </div>
                     </div>
                 `).join('')}
+                </div>
+                </div>
             </div>
         </div>`;
 }
@@ -3360,6 +3392,125 @@ window.handlePackerAssign = async function(orderId, packerName, priority) {
     try {
         await window.db.assignPacker(orderId, packerName || null, priority ? parseInt(priority, 10) : null);
         showToast('Packing assignment updated', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+};
+
+// ==========================================
+// RICKSHAW DISPATCH
+// ==========================================
+const RICKSHAW_WALA_NAMES = ['Badri','Munna','Krishna','Nitesh','Rampukar','Praveen','Shankar','Sarwan','Nandu'];
+
+// Cycled per distinct (rickshaw_wala + rickshaw_slot) trip group so orders
+// travelling together share an obvious visual tint, not just matching text.
+const RICKSHAW_GROUP_COLORS = [
+    { bg: 'bg-amber-50',   border: 'border-amber-400',   text: 'text-amber-700',   dot: 'bg-amber-500' },
+    { bg: 'bg-emerald-50', border: 'border-emerald-400', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    { bg: 'bg-sky-50',     border: 'border-sky-400',     text: 'text-sky-700',     dot: 'bg-sky-500' },
+    { bg: 'bg-violet-50',  border: 'border-violet-400',  text: 'text-violet-700',  dot: 'bg-violet-500' },
+    { bg: 'bg-rose-50',    border: 'border-rose-400',    text: 'text-rose-700',    dot: 'bg-rose-500' },
+    { bg: 'bg-teal-50',    border: 'border-teal-400',    text: 'text-teal-700',    dot: 'bg-teal-500' },
+];
+
+async function renderRickshawDispatch(container) {
+    container.innerHTML = renderLoadingState();
+    let orders;
+    try {
+        orders = await window.db.getOrdersForRickshawDispatch();
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="max-w-2xl mx-auto mt-10 p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <p class="font-bold mb-1">Couldn't load orders</p>
+            <p>${escapeHtml(err.message || 'Unknown error')}</p>
+            <p class="mt-2 text-xs text-red-500">This usually means the rickshaw_wala/rickshaw_location/rickshaw_slot migration hasn't been run in Supabase yet.</p>
+        </div>`;
+        return;
+    }
+
+    // Orders sharing the same rickshaw_wala + rickshaw_slot (both set) travelled
+    // together in one trip — give each such group its own tint + badge.
+    const tripKey = o => (o.rickshaw_wala && o.rickshaw_slot) ? `${o.rickshaw_wala}__${o.rickshaw_slot}` : null;
+    const tripCounts = {};
+    orders.forEach(o => {
+        const key = tripKey(o);
+        if (key) tripCounts[key] = (tripCounts[key] || 0) + 1;
+    });
+    const tripColors = {};
+    let colorIdx = 0;
+    Object.keys(tripCounts).forEach(key => {
+        if (tripCounts[key] > 1) {
+            tripColors[key] = RICKSHAW_GROUP_COLORS[colorIdx % RICKSHAW_GROUP_COLORS.length];
+            colorIdx++;
+        }
+    });
+
+    container.innerHTML = `
+        <div class="max-w-5xl mx-auto animate-in">
+            <div class="mb-6">
+                <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Rickshaw Dispatch</h2>
+                <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot. Orders sharing the same driver + slot travelled together in one trip — those are tinted and grouped below.</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                <div class="min-w-[880px]">
+                <div class="grid grid-cols-12 gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <div class="col-span-2">Order</div>
+                    <div class="col-span-2">Customer</div>
+                    <div class="col-span-2">Current Step</div>
+                    <div class="col-span-2">Rickshaw Wala</div>
+                    <div class="col-span-2">Location</div>
+                    <div class="col-span-2">Slot</div>
+                </div>
+                ${orders.length === 0 ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>` : orders.map(o => {
+                    const key = tripKey(o);
+                    const color = key ? tripColors[key] : null;
+                    return `
+                    <div class="grid grid-cols-12 gap-2 px-5 py-3 border-b border-gray-50 items-center ${color ? `${color.bg} border-l-4 ${color.border}` : ''}" data-order-row="${o.id}">
+                        <div class="col-span-2">
+                            <p class="font-bold text-sm text-gray-900">${o.order_code}</p>
+                        </div>
+                        <div class="col-span-2 text-sm text-gray-700 truncate">${escapeHtml(o.customer_name)}</div>
+                        <div class="col-span-2">
+                            <span class="text-[11px] font-bold px-2 py-1 rounded bg-gray-100 text-gray-500">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
+                        </div>
+                        <div class="col-span-2">
+                            <select id="rw-wala-${o.id}" onchange="handleRickshawAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                                <option value="" ${!o.rickshaw_wala ? 'selected' : ''}>Unassigned</option>
+                                ${RICKSHAW_WALA_NAMES.map(n => `<option value="${n}" ${o.rickshaw_wala === n ? 'selected' : ''}>${n}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <input id="rw-loc-${o.id}" type="text" value="${escapeHtml(o.rickshaw_location || '')}"
+                                onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Karol Bagh transporter"
+                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                        </div>
+                        <div class="col-span-2">
+                            <input id="rw-slot-${o.id}" type="text" value="${escapeHtml(o.rickshaw_slot || '')}"
+                                onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Slot 1 / Morning trip"
+                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                        </div>
+                        ${color ? `
+                        <div class="col-span-12 -mt-1 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full ${color.dot} flex-shrink-0"></span>
+                            <span class="text-[11px] font-semibold ${color.text}">Travelling together — ${tripCounts[key]} orders in this trip</span>
+                        </div>` : ''}
+                    </div>
+                `; }).join('')}
+                </div>
+                </div>
+            </div>
+        </div>`;
+    lucide.createIcons();
+}
+
+window.handleRickshawAssign = async function(orderId) {
+    const wala = document.getElementById(`rw-wala-${orderId}`)?.value || '';
+    const location = document.getElementById(`rw-loc-${orderId}`)?.value.trim() || '';
+    const slot = document.getElementById(`rw-slot-${orderId}`)?.value.trim() || '';
+    try {
+        await window.db.assignRickshawTrip(orderId, wala || null, location || null, slot || null);
+        showToast('Rickshaw dispatch updated', 'success');
     } catch (err) {
         showToast(err.message, 'error');
     }
@@ -3390,6 +3541,7 @@ async function renderPaymentStatus(container) {
     const renderTable = (list) => `
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             ${list.length === 0 ? `<div class="p-8 text-center text-gray-400 text-sm">No orders here.</div>` : `
+            <div class="overflow-x-auto">
             <table class="w-full text-left text-sm whitespace-nowrap">
                 <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
                     <tr>
@@ -3414,7 +3566,8 @@ async function renderPaymentStatus(container) {
                             <td class="px-5 py-3">${paymentTermBadge(o.payment_term)}</td>
                         </tr>`).join('')}
                 </tbody>
-            </table>`}
+            </table>
+            </div>`}
         </div>`;
 
     container.innerHTML = `
