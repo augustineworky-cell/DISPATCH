@@ -3402,8 +3402,9 @@ window.handlePackerAssign = async function(orderId, packerName, priority) {
 // ==========================================
 const RICKSHAW_WALA_NAMES = ['Badri','Munna','Krishna','Nitesh','Rampukar','Praveen','Shankar','Sarwan','Nandu'];
 
-// Cycled per distinct (rickshaw_wala + rickshaw_slot) trip group so orders
-// travelling together share an obvious visual tint, not just matching text.
+// One color per driver section — every trip under that driver shares it (the
+// trip *headers*, not color, are what disambiguate separate trips from the
+// same driver; color is secondary visual polish on top of that).
 const RICKSHAW_GROUP_COLORS = [
     { bg: 'bg-amber-50',   border: 'border-amber-400',   text: 'text-amber-700',   dot: 'bg-amber-500' },
     { bg: 'bg-emerald-50', border: 'border-emerald-400', text: 'text-emerald-700', dot: 'bg-emerald-500' },
@@ -3412,6 +3413,76 @@ const RICKSHAW_GROUP_COLORS = [
     { bg: 'bg-rose-50',    border: 'border-rose-400',    text: 'text-rose-700',    dot: 'bg-rose-500' },
     { bg: 'bg-teal-50',    border: 'border-teal-400',    text: 'text-teal-700',    dot: 'bg-teal-500' },
 ];
+
+function renderRickshawOrderRow(o, tint) {
+    return `
+        <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-50 ${tint ? `${tint.bg} border-l-4 ${tint.border}` : ''}" data-order-row="${o.id}">
+            <div class="w-28 flex-shrink-0">
+                <p class="font-bold text-sm text-gray-900 truncate">${o.order_code}</p>
+            </div>
+            <div class="w-36 flex-shrink-0 text-sm text-gray-700 truncate">${escapeHtml(o.customer_name)}</div>
+            <div class="w-32 flex-shrink-0">
+                <span class="text-[11px] font-bold px-2 py-1 rounded bg-gray-100 text-gray-500 inline-block truncate max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
+            </div>
+            <div class="w-36 flex-shrink-0">
+                <select id="rw-wala-${o.id}" onchange="handleRickshawAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                    <option value="" ${!o.rickshaw_wala ? 'selected' : ''}>Unassigned</option>
+                    ${RICKSHAW_WALA_NAMES.map(n => `<option value="${n}" ${o.rickshaw_wala === n ? 'selected' : ''}>${n}</option>`).join('')}
+                </select>
+            </div>
+            <div class="flex-1 min-w-[160px]">
+                <input id="rw-loc-${o.id}" type="text" value="${escapeHtml(o.rickshaw_location || '')}"
+                    onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Karol Bagh transporter"
+                    class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+            </div>
+            <div class="flex-1 min-w-[160px]">
+                <input id="rw-slot-${o.id}" type="text" value="${escapeHtml(o.rickshaw_slot || '')}"
+                    onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Slot 1 / Morning trip"
+                    class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+            </div>
+            <div class="w-24 flex-shrink-0 flex items-center gap-1.5">
+                <button onclick="handleRickshawAssign('${o.id}', true)" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition flex-shrink-0">
+                    <i data-lucide="save" class="w-3 h-3"></i> Save
+                </button>
+                <span id="rw-saved-${o.id}" class="text-emerald-600 flex-shrink-0 opacity-0 transition-opacity duration-300 pointer-events-none">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                </span>
+            </div>
+        </div>`;
+}
+
+function renderRickshawTripSections(driverOrders, color) {
+    // Sub-group a driver's orders by trip (rickshaw_slot). Same non-empty slot
+    // = one trip, travelling together. Different slot, or no slot at all,
+    // each get their own labeled section — so it's never implied by color alone.
+    const bySlot = {};
+    const noSlot = [];
+    driverOrders.forEach(o => {
+        const slot = (o.rickshaw_slot || '').trim();
+        if (slot) (bySlot[slot] ||= []).push(o);
+        else noSlot.push(o);
+    });
+
+    let html = '';
+    Object.keys(bySlot).forEach(slot => {
+        const list = bySlot[slot];
+        html += `
+            <div class="px-5 pt-3 pb-1.5 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full ${color.dot} flex-shrink-0"></span>
+                <span class="text-[11px] font-bold ${color.text} uppercase tracking-wide">Trip: ${escapeHtml(slot)} — ${list.length} order${list.length === 1 ? '' : 's'} travelling together</span>
+            </div>
+            ${list.map(o => renderRickshawOrderRow(o, list.length > 1 ? color : null)).join('')}`;
+    });
+    noSlot.forEach(o => {
+        html += `
+            <div class="px-5 pt-3 pb-1.5 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></span>
+                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Separate trip (no slot set)</span>
+            </div>
+            ${renderRickshawOrderRow(o, null)}`;
+    });
+    return html;
+}
 
 async function renderRickshawDispatch(container) {
     container.innerHTML = renderLoadingState();
@@ -3428,75 +3499,67 @@ async function renderRickshawDispatch(container) {
         return;
     }
 
-    // Orders sharing the same rickshaw_wala + rickshaw_slot (both set) travelled
-    // together in one trip — give each such group its own tint + badge.
-    const tripKey = o => (o.rickshaw_wala && o.rickshaw_slot) ? `${o.rickshaw_wala}__${o.rickshaw_slot}` : null;
-    const tripCounts = {};
+    // Group primarily by driver (the question that matters: "who is carrying
+    // this order"), then by trip/slot within that driver ("is it going with
+    // anything else, or alone"). Unassigned orders surface at the top so
+    // they don't get lost.
+    const unassigned = orders.filter(o => !o.rickshaw_wala);
+    const byDriver = {};
     orders.forEach(o => {
-        const key = tripKey(o);
-        if (key) tripCounts[key] = (tripCounts[key] || 0) + 1;
+        if (!o.rickshaw_wala) return;
+        (byDriver[o.rickshaw_wala] ||= []).push(o);
     });
-    const tripColors = {};
-    let colorIdx = 0;
-    Object.keys(tripCounts).forEach(key => {
-        if (tripCounts[key] > 1) {
-            tripColors[key] = RICKSHAW_GROUP_COLORS[colorIdx % RICKSHAW_GROUP_COLORS.length];
-            colorIdx++;
-        }
-    });
+    const driversInOrder = RICKSHAW_WALA_NAMES.filter(n => byDriver[n]?.length);
+    Object.keys(byDriver).forEach(n => { if (!driversInOrder.includes(n)) driversInOrder.push(n); });
+
+    const headerRow = `
+        <div class="flex items-center gap-2 px-5 py-3 bg-gray-100 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+            <div class="w-28 flex-shrink-0">Order</div>
+            <div class="w-36 flex-shrink-0">Customer</div>
+            <div class="w-32 flex-shrink-0">Current Step</div>
+            <div class="w-36 flex-shrink-0">Rickshaw Wala</div>
+            <div class="flex-1 min-w-[160px]">Location</div>
+            <div class="flex-1 min-w-[160px]">Slot</div>
+            <div class="w-24 flex-shrink-0">Save</div>
+        </div>`;
+
+    const unassignedSection = unassigned.length ? `
+        <div class="border-b border-gray-100">
+            <div class="px-5 py-2.5 bg-gray-50 flex items-center gap-2">
+                <i data-lucide="help-circle" class="w-4 h-4 text-gray-400"></i>
+                <span class="text-xs font-extrabold text-gray-500 uppercase tracking-wider">Unassigned</span>
+                <span class="text-[11px] text-gray-400 font-semibold">— ${unassigned.length} order${unassigned.length === 1 ? '' : 's'}</span>
+            </div>
+            ${unassigned.map(o => renderRickshawOrderRow(o, null)).join('')}
+        </div>` : '';
+
+    const driverSections = driversInOrder.map((driver, idx) => {
+        const color = RICKSHAW_GROUP_COLORS[idx % RICKSHAW_GROUP_COLORS.length];
+        const list = byDriver[driver];
+        return `
+        <div class="border-b border-gray-100">
+            <div class="px-5 py-2.5 bg-gray-50 flex items-center gap-2">
+                <i data-lucide="bike" class="w-4 h-4 ${color.text}"></i>
+                <span class="text-xs font-extrabold text-gray-700">${escapeHtml(driver)}</span>
+                <span class="text-[11px] text-gray-400 font-semibold">— ${list.length} order${list.length === 1 ? '' : 's'}</span>
+            </div>
+            ${renderRickshawTripSections(list, color)}
+        </div>`;
+    }).join('');
 
     container.innerHTML = `
         <div class="max-w-5xl mx-auto animate-in">
             <div class="mb-6">
                 <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Rickshaw Dispatch</h2>
-                <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot. Orders sharing the same driver + slot travelled together in one trip — those are tinted and grouped below.</p>
+                <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot. Orders are grouped by driver, then by trip — orders in the same "Trip" section travelled together; separate sections mean separate trips.</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="overflow-x-auto">
-                <div class="min-w-[880px]">
-                <div class="grid grid-cols-12 gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    <div class="col-span-2">Order</div>
-                    <div class="col-span-2">Customer</div>
-                    <div class="col-span-2">Current Step</div>
-                    <div class="col-span-2">Rickshaw Wala</div>
-                    <div class="col-span-2">Location</div>
-                    <div class="col-span-2">Slot</div>
-                </div>
-                ${orders.length === 0 ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>` : orders.map(o => {
-                    const key = tripKey(o);
-                    const color = key ? tripColors[key] : null;
-                    return `
-                    <div class="grid grid-cols-12 gap-2 px-5 py-3 border-b border-gray-50 items-center ${color ? `${color.bg} border-l-4 ${color.border}` : ''}" data-order-row="${o.id}">
-                        <div class="col-span-2">
-                            <p class="font-bold text-sm text-gray-900">${o.order_code}</p>
-                        </div>
-                        <div class="col-span-2 text-sm text-gray-700 truncate">${escapeHtml(o.customer_name)}</div>
-                        <div class="col-span-2">
-                            <span class="text-[11px] font-bold px-2 py-1 rounded bg-gray-100 text-gray-500">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
-                        </div>
-                        <div class="col-span-2">
-                            <select id="rw-wala-${o.id}" onchange="handleRickshawAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
-                                <option value="" ${!o.rickshaw_wala ? 'selected' : ''}>Unassigned</option>
-                                ${RICKSHAW_WALA_NAMES.map(n => `<option value="${n}" ${o.rickshaw_wala === n ? 'selected' : ''}>${n}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div class="col-span-2">
-                            <input id="rw-loc-${o.id}" type="text" value="${escapeHtml(o.rickshaw_location || '')}"
-                                onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Karol Bagh transporter"
-                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
-                        </div>
-                        <div class="col-span-2">
-                            <input id="rw-slot-${o.id}" type="text" value="${escapeHtml(o.rickshaw_slot || '')}"
-                                onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Slot 1 / Morning trip"
-                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
-                        </div>
-                        ${color ? `
-                        <div class="col-span-12 -mt-1 flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full ${color.dot} flex-shrink-0"></span>
-                            <span class="text-[11px] font-semibold ${color.text}">Travelling together — ${tripCounts[key]} orders in this trip</span>
-                        </div>` : ''}
-                    </div>
-                `; }).join('')}
+                <div class="min-w-[1080px]">
+                ${headerRow}
+                ${orders.length === 0
+                    ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>`
+                    : `${unassignedSection}${driverSections}`}
                 </div>
                 </div>
             </div>
@@ -3504,13 +3567,26 @@ async function renderRickshawDispatch(container) {
     lucide.createIcons();
 }
 
-window.handleRickshawAssign = async function(orderId) {
+window.handleRickshawAssign = async function(orderId, showInlineConfirm) {
     const wala = document.getElementById(`rw-wala-${orderId}`)?.value || '';
     const location = document.getElementById(`rw-loc-${orderId}`)?.value.trim() || '';
     const slot = document.getElementById(`rw-slot-${orderId}`)?.value.trim() || '';
     try {
         await window.db.assignRickshawTrip(orderId, wala || null, location || null, slot || null);
-        showToast('Rickshaw dispatch updated', 'success');
+        if (showInlineConfirm) {
+            const badge = document.getElementById(`rw-saved-${orderId}`);
+            if (badge) {
+                badge.classList.remove('opacity-0');
+                badge.classList.add('opacity-100');
+                clearTimeout(badge._rwHideTimer);
+                badge._rwHideTimer = setTimeout(() => {
+                    badge.classList.remove('opacity-100');
+                    badge.classList.add('opacity-0');
+                }, 1500);
+            }
+        } else {
+            showToast('Rickshaw dispatch updated', 'success');
+        }
     } catch (err) {
         showToast(err.message, 'error');
     }
