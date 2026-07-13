@@ -234,6 +234,13 @@ async function router() {
             }
         }
         else if (hash === '#/rickshaw-dispatch') await renderRickshawDispatch(main);
+        else if (hash === '#/whatsapp-orders') {
+            if (!['admin', 'manager', 'crm', 'sales'].includes(currentUser?.role)) {
+                main.innerHTML = '<div class="p-8 text-center text-gray-500">You don\'t have access to this page.</div>';
+            } else {
+                await renderWhatsAppOrders(main);
+            }
+        }
         else if (hash === '#/payment-status') await renderPaymentStatus(main);
         else if (hash === '#/mobile') await renderMobileHome(main);
         else if (hash === '#/mobile/orders') await renderMobileOrders(main);
@@ -273,6 +280,7 @@ function renderSidebar() {
                 ${navItem('#/analytics', 'bar-chart-3', 'Analytics', path.includes('analytics'))}
                 ${['admin', 'manager', 'crm'].includes(currentUser?.role) ? navItem('#/packing-assignment', 'clipboard-list', 'Packing Assignment', path.includes('packing-assignment')) : ''}
                 ${navItem('#/rickshaw-dispatch', 'bike', 'Rickshaw Dispatch', path.includes('rickshaw-dispatch'))}
+                ${['admin', 'manager', 'crm', 'sales'].includes(currentUser?.role) ? navItem('#/whatsapp-orders', 'message-circle', 'WhatsApp Orders', path.includes('whatsapp-orders')) : ''}
                 ${navItem('#/payment-status', 'banknote', 'Payment Status', path.includes('payment-status'))}
             </nav>
             <div class="p-4 bg-black/20 backdrop-blur-sm m-4 rounded-xl border border-white/10">
@@ -961,7 +969,7 @@ async function renderNewOrder(container) {
                             <select id="no_sales" required onchange="handleSalesChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                                 <option value="" disabled selected>Select source...</option>
                                 <option value="Meena Bansal">Meena Bansal</option>
-                                <option value="Ansu Bansal">Ansu Bansal</option>
+                                <option value="Anshu Bansal">Anshu Bansal</option>
                                 <option value="Shubhash Bansal">Shubhash Bansal</option>
                                 <option value="IndiaMart">IndiaMart</option>
                                 <option value="Manisha">Manisha</option>
@@ -1579,6 +1587,29 @@ window.toggleLanguage = function() {
     router();
 };
 
+// Shared by the New Order form and the WhatsApp Orders review page —
+// upserts the customer, then creates the order via the create_order RPC.
+// order_code/order_number are generated server-side by that RPC.
+async function createOrderFromFields(f) {
+    const customerId = await window.db.upsertCustomer(currentOrgId, f.companyName, f.customerPhone);
+    return window.db.createOrder({
+        organizationId: currentOrgId,
+        customerId: customerId,
+        customerName: f.companyName,
+        customerPhone: f.customerPhone,
+        customerPhone2: f.customerPhone2 || null,
+        contactPerson: f.contactPerson || null,
+        city: f.city || null,
+        state: f.state || null,
+        paymentType: f.paymentType,
+        bankName: f.bankName || null,
+        dispatchMode: f.dispatchMode,
+        salesPersonName: f.salesPersonName || null,
+        paymentTerm: f.paymentTerm || null,
+        orderValue: null   // BMH's process doesn't track this — schema column stays nullable
+    });
+}
+
 window.handleCreateOrder = async function(e) {
     e.preventDefault();
     const btn = document.getElementById('no_submit_btn');
@@ -1593,9 +1624,6 @@ window.handleCreateOrder = async function(e) {
         const paymentTypeInput = document.getElementById('no_payment_type').value;
         const bankNameInput = paymentTypeInput === 'BANK' ? (document.getElementById('no_bank_name').value || null) : null;
 
-        // order_code/order_number are generated server-side by the create_order RPC
-        const customerId = await window.db.upsertCustomer(currentOrgId, companyNameInput, customerPhoneInput);
-
         const cityEl = document.getElementById('no_city');
         const cityInput = cityEl.value === '__OTHER__'
             ? document.getElementById('no_city_custom').value.trim()
@@ -1606,10 +1634,8 @@ window.handleCreateOrder = async function(e) {
             ? document.getElementById('no_state_custom').value.trim()
             : stateEl.value;
 
-        const newOrder = await window.db.createOrder({
-            organizationId: currentOrgId,
-            customerId: customerId,
-            customerName: companyNameInput,
+        const newOrder = await createOrderFromFields({
+            companyName: companyNameInput,
             customerPhone: customerPhoneInput,
             customerPhone2: customerPhone2Input,
             contactPerson: document.getElementById('no_contact_person').value.trim() || null,
@@ -1621,8 +1647,7 @@ window.handleCreateOrder = async function(e) {
             salesPersonName: salesEl.value === '__OTHER__'
                 ? document.getElementById('no_sales_custom').value.trim()
                 : salesEl.value,
-            paymentTerm: document.getElementById('no_payment_term').value,
-            orderValue: null   // BMH's process doesn't track this — schema column stays nullable
+            paymentTerm: document.getElementById('no_payment_term').value
         });
 
         const piFile = document.getElementById('no_pi_file').files[0];
@@ -3598,6 +3623,278 @@ window.markRickshawReached = async function(orderId) {
         await window.db.markRickshawReached(orderId);
         showToast('Marked as reached', 'success');
         renderRickshawDispatch(document.getElementById('main-content'));
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+};
+
+// ==========================================
+// WHATSAPP ORDERS (AI-extracted, pending human review)
+// ==========================================
+// Same city/state option lists as the New Order form (renderNewOrder) —
+// duplicated locally rather than shared so this page stays fully
+// independent of that form's markup.
+const WA_CITY_OPTIONS = ['Delhi','Gurgaon','Noida','Ghaziabad','Faridabad','Mumbai','Bangalore','Chennai','Kolkata','Hyderabad','Pune','Ahmedabad','Jaipur','Lucknow','Chandigarh'];
+const WA_STATE_OPTIONS = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Chandigarh','Puducherry'];
+
+function renderWaEmptyState() {
+    return `
+        <div class="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-400">
+            <i data-lucide="check-circle-2" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
+            <p class="font-semibold text-gray-500">No new WhatsApp orders to review</p>
+            <p class="text-sm mt-1">Incoming WhatsApp messages that look like orders will show up here for review.</p>
+        </div>`;
+}
+
+function maybeShowWaEmptyState() {
+    const list = document.getElementById('wa-pending-list');
+    if (list && list.children.length === 0) {
+        list.innerHTML = renderWaEmptyState();
+        lucide.createIcons();
+    }
+}
+
+function renderWhatsAppOrderCard(p) {
+    const cityIsOther = !!p.extracted_city && !WA_CITY_OPTIONS.includes(p.extracted_city);
+    const stateIsOther = !!p.extracted_state && !WA_STATE_OPTIONS.includes(p.extracted_state);
+    const payType = ['CASH', 'UPI', 'BANK'].includes(p.extracted_payment_type) ? p.extracted_payment_type : 'CASH';
+    const dispatchMode = ['PORTER', 'TEMPO', 'RICKSHAW'].includes(p.extracted_dispatch_mode) ? p.extracted_dispatch_mode : 'PORTER';
+
+    return `
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" data-pending-row="${p.id}">
+        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2 text-xs text-gray-500 min-w-0">
+                <i data-lucide="phone" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span class="font-semibold text-gray-700 truncate">${escapeHtml(p.sender_name || 'Unknown sender')}</span>
+                <span>·</span>
+                <span>${escapeHtml(p.sender_phone || '—')}</span>
+            </div>
+            <span class="text-[11px] text-gray-400 flex-shrink-0">${p.received_at ? new Date(p.received_at).toLocaleString() : ''}</span>
+        </div>
+        <div class="p-5 space-y-5">
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Raw WhatsApp Message</p>
+                ${escapeHtml(p.raw_message)}
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Company Name *</label>
+                    <input type="text" id="wa_company_${p.id}" value="${escapeHtml(p.extracted_company_name || '')}" placeholder="Company name..." class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Contact Person</label>
+                    <input type="text" id="wa_contact_${p.id}" value="${escapeHtml(p.extracted_contact_person || '')}" placeholder="e.g. Shreya" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Phone</label>
+                    <input type="tel" id="wa_phone_${p.id}" value="${escapeHtml(p.extracted_phone || '')}" placeholder="9876543210" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">City</label>
+                    <select id="wa_city_${p.id}" onchange="handleWaCityChange(this, '${p.id}')" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="" ${!p.extracted_city ? 'selected' : ''} disabled>Select city...</option>
+                        ${WA_CITY_OPTIONS.map(c => `<option value="${c}" ${p.extracted_city === c ? 'selected' : ''}>${c}</option>`).join('')}
+                        <option value="__OTHER__" ${cityIsOther ? 'selected' : ''}>+ Other (type city)</option>
+                    </select>
+                    <input type="text" id="wa_city_custom_${p.id}" value="${cityIsOther ? escapeHtml(p.extracted_city) : ''}" placeholder="Enter city name..." style="display:${cityIsOther ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2 text-sm mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">State</label>
+                    <select id="wa_state_${p.id}" onchange="handleWaStateChange(this, '${p.id}')" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="" ${!p.extracted_state ? 'selected' : ''} disabled>Select state...</option>
+                        ${WA_STATE_OPTIONS.map(s => `<option value="${s}" ${p.extracted_state === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        <option value="__OTHER__" ${stateIsOther ? 'selected' : ''}>+ Other (type state)</option>
+                    </select>
+                    <input type="text" id="wa_state_custom_${p.id}" value="${stateIsOther ? escapeHtml(p.extracted_state) : ''}" placeholder="Enter state name..." style="display:${stateIsOther ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2 text-sm mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Payment Type</label>
+                    <select id="wa_paytype_${p.id}" onchange="handleWaPaymentTypeChange(this, '${p.id}')" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="CASH" ${payType === 'CASH' ? 'selected' : ''}>CASH</option>
+                        <option value="UPI" ${payType === 'UPI' ? 'selected' : ''}>UPI</option>
+                        <option value="BANK" ${payType === 'BANK' ? 'selected' : ''}>BANK</option>
+                    </select>
+                    <select id="wa_bank_${p.id}" style="display:${payType === 'BANK' ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2 text-sm mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="" disabled selected>Select bank...</option>
+                        <option value="KOTAK">KOTAK</option>
+                        <option value="PNB">PNB</option>
+                        <option value="HDFC">HDFC</option>
+                    </select>
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Dispatch Mode</label>
+                    <select id="wa_mode_${p.id}" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="PORTER" ${dispatchMode === 'PORTER' ? 'selected' : ''}>PORTER</option>
+                        <option value="TEMPO" ${dispatchMode === 'TEMPO' ? 'selected' : ''}>TEMPO</option>
+                        <option value="RICKSHAW" ${dispatchMode === 'RICKSHAW' ? 'selected' : ''}>RICKSHAW</option>
+                    </select>
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Order Referred By *</label>
+                    <select id="wa_sales_${p.id}" onchange="handleWaSalesChange(this, '${p.id}')" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="" disabled selected>Select source...</option>
+                        <option value="Meena Bansal">Meena Bansal</option>
+                        <option value="Anshu Bansal">Anshu Bansal</option>
+                        <option value="Shubhash Bansal">Shubhash Bansal</option>
+                        <option value="IndiaMart">IndiaMart</option>
+                        <option value="Manisha">Manisha</option>
+                        <option value="__OTHER__">+ Others (type name)</option>
+                    </select>
+                    <input type="text" id="wa_sales_custom_${p.id}" placeholder="Enter name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2 text-sm mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button onclick="rejectWhatsAppOrder('${p.id}')" class="px-4 py-2 text-sm font-bold text-red-600 bg-white border border-red-300 hover:bg-red-50 rounded-lg transition flex items-center gap-1.5">
+                    <i data-lucide="x" class="w-4 h-4"></i> Reject
+                </button>
+                <button id="wa_approve_btn_${p.id}" onclick="approveWhatsAppOrder('${p.id}')" class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow flex items-center gap-1.5">
+                    <i data-lucide="check" class="w-4 h-4"></i> Approve & Create Order
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+async function renderWhatsAppOrders(container) {
+    container.innerHTML = renderLoadingState();
+    let pending;
+    try {
+        pending = await window.db.getWhatsAppPendingOrders();
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="max-w-2xl mx-auto mt-10 p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <p class="font-bold mb-1">Couldn't load WhatsApp orders</p>
+            <p>${escapeHtml(err.message || 'Unknown error')}</p>
+            <p class="mt-2 text-xs text-red-500">This usually means the whatsapp_pending_orders migration hasn't been run in Supabase yet.</p>
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="max-w-3xl mx-auto animate-in">
+            <div class="mb-6">
+                <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">WhatsApp Orders</h2>
+                <p class="text-sm text-gray-500 mt-1">Review AI-extracted order details from incoming WhatsApp messages against the raw text, correct anything wrong, then approve or reject.</p>
+            </div>
+            <div id="wa-pending-list" class="space-y-5">
+                ${pending.length === 0 ? renderWaEmptyState() : pending.map(p => renderWhatsAppOrderCard(p)).join('')}
+            </div>
+        </div>`;
+    lucide.createIcons();
+}
+
+window.handleWaCityChange = function(selectEl, pendingId) {
+    const customInput = document.getElementById(`wa_city_custom_${pendingId}`);
+    if (selectEl.value === '__OTHER__') {
+        customInput.style.display = 'block';
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+    }
+};
+
+window.handleWaStateChange = function(selectEl, pendingId) {
+    const customInput = document.getElementById(`wa_state_custom_${pendingId}`);
+    if (selectEl.value === '__OTHER__') {
+        customInput.style.display = 'block';
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+    }
+};
+
+window.handleWaPaymentTypeChange = function(selectEl, pendingId) {
+    const bankSelect = document.getElementById(`wa_bank_${pendingId}`);
+    if (selectEl.value === 'BANK') {
+        bankSelect.style.display = 'block';
+        bankSelect.required = true;
+    } else {
+        bankSelect.style.display = 'none';
+        bankSelect.required = false;
+        bankSelect.value = '';
+    }
+};
+
+window.handleWaSalesChange = function(selectEl, pendingId) {
+    const customInput = document.getElementById(`wa_sales_custom_${pendingId}`);
+    if (selectEl.value === '__OTHER__') {
+        customInput.style.display = 'block';
+        customInput.required = true;
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
+        customInput.required = false;
+        customInput.value = '';
+    }
+};
+
+window.approveWhatsAppOrder = async function(pendingId) {
+    const companyName = document.getElementById(`wa_company_${pendingId}`).value.trim();
+    if (!companyName) return showToast('Company name is required', 'error');
+
+    const salesEl = document.getElementById(`wa_sales_${pendingId}`);
+    const salesPersonName = salesEl.value === '__OTHER__'
+        ? document.getElementById(`wa_sales_custom_${pendingId}`).value.trim()
+        : salesEl.value;
+    if (!salesPersonName) return showToast('Please select who this order is referred by', 'error');
+
+    const btn = document.getElementById(`wa_approve_btn_${pendingId}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline"></i> Creating...`;
+        lucide.createIcons();
+    }
+
+    try {
+        const cityEl = document.getElementById(`wa_city_${pendingId}`);
+        const cityInput = cityEl.value === '__OTHER__'
+            ? document.getElementById(`wa_city_custom_${pendingId}`).value.trim()
+            : cityEl.value;
+
+        const stateEl = document.getElementById(`wa_state_${pendingId}`);
+        const stateInput = stateEl.value === '__OTHER__'
+            ? document.getElementById(`wa_state_custom_${pendingId}`).value.trim()
+            : stateEl.value;
+
+        const paymentTypeInput = document.getElementById(`wa_paytype_${pendingId}`).value;
+        const bankNameInput = paymentTypeInput === 'BANK' ? (document.getElementById(`wa_bank_${pendingId}`).value || null) : null;
+
+        const newOrder = await createOrderFromFields({
+            companyName,
+            customerPhone: document.getElementById(`wa_phone_${pendingId}`).value.trim() || null,
+            contactPerson: document.getElementById(`wa_contact_${pendingId}`).value.trim() || null,
+            city: cityInput || null,
+            state: stateInput || null,
+            paymentType: paymentTypeInput,
+            bankName: bankNameInput,
+            dispatchMode: document.getElementById(`wa_mode_${pendingId}`).value,
+            salesPersonName
+        });
+
+        await window.db.resolveWhatsAppPendingOrder(pendingId, 'approved', currentUser.id, newOrder.id);
+
+        showToast('Order created from WhatsApp message!', 'success');
+        document.querySelector(`[data-pending-row="${pendingId}"]`)?.remove();
+        maybeShowWaEmptyState();
+    } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Approve & Create Order`;
+            lucide.createIcons();
+        }
+    }
+};
+
+window.rejectWhatsAppOrder = async function(pendingId) {
+    try {
+        await window.db.resolveWhatsAppPendingOrder(pendingId, 'rejected', currentUser.id);
+        showToast('WhatsApp message rejected', 'success');
+        document.querySelector(`[data-pending-row="${pendingId}"]`)?.remove();
+        maybeShowWaEmptyState();
     } catch (err) {
         showToast(err.message, 'error');
     }

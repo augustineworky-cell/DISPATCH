@@ -416,6 +416,31 @@ window.db = {
         if (error) throw error;
     },
 
+    // ─── WHATSAPP ORDERS (AI-extracted, pending human review) ───
+    async getWhatsAppPendingOrders() {
+        const { data, error } = await supabaseClient
+            .from('whatsapp_pending_orders')
+            .select('*')
+            .eq('status', 'pending')
+            .order('received_at', { ascending: true });
+        if (error) { console.error('getWhatsAppPendingOrders:', error); throw error; }
+        return data || [];
+    },
+
+    // Marks a pending entry approved/rejected. createdOrderId is only passed
+    // on approval — the order itself is created separately by the caller
+    // (via upsertCustomer()/createOrder()) before this is called, so this
+    // method never creates an order itself.
+    async resolveWhatsAppPendingOrder(pendingId, status, reviewerId, createdOrderId) {
+        const update = { status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString() };
+        if (createdOrderId) update.created_order_id = createdOrderId;
+        const { error } = await supabaseClient
+            .from('whatsapp_pending_orders')
+            .update(update)
+            .eq('id', pendingId);
+        if (error) throw error;
+    },
+
     // Mobile packing queue: assigned + not yet accepted, sorted by priority.
     async getPackingQueue() {
         const { data, error } = await supabaseClient
