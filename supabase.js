@@ -387,11 +387,14 @@ window.db = {
 
     // ─── RICKSHAW DISPATCH ───
     // Active orders, for the rickshaw driver/handoff assignment page.
+    // Excludes orders already marked reached — that's what "closes" an
+    // order out of this page once the rickshaw has handed it off.
     async getOrdersForRickshawDispatch() {
         const { data, error } = await supabaseClient
             .from('orders')
             .select('*')
             .eq('is_deleted', false).eq('is_cancelled', false).eq('is_completed', false)
+            .is('rickshaw_reached_at', null)
             .order('created_at', { ascending: true });
         if (error) { console.error('getOrdersForRickshawDispatch:', error); throw error; }
         return data || [];
@@ -401,6 +404,14 @@ window.db = {
         const { error } = await supabaseClient
             .from('orders')
             .update({ rickshaw_wala: rickshawWala || null, rickshaw_location: location || null, rickshaw_slot: slot || null })
+            .eq('id', orderId);
+        if (error) throw error;
+    },
+
+    async markRickshawReached(orderId) {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({ rickshaw_reached_at: new Date().toISOString() })
             .eq('id', orderId);
         if (error) throw error;
     },

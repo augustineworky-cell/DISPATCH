@@ -3425,24 +3425,27 @@ function renderRickshawOrderRow(o, tint) {
                 <span class="text-[11px] font-bold px-2 py-1 rounded bg-gray-100 text-gray-500 inline-block truncate max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
             </div>
             <div class="w-36 flex-shrink-0">
-                <select id="rw-wala-${o.id}" onchange="handleRickshawAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                <select id="rw-wala-${o.id}" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
                     <option value="" ${!o.rickshaw_wala ? 'selected' : ''}>Unassigned</option>
                     ${RICKSHAW_WALA_NAMES.map(n => `<option value="${n}" ${o.rickshaw_wala === n ? 'selected' : ''}>${n}</option>`).join('')}
                 </select>
             </div>
             <div class="flex-1 min-w-[160px]">
                 <input id="rw-loc-${o.id}" type="text" value="${escapeHtml(o.rickshaw_location || '')}"
-                    onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Karol Bagh transporter"
+                    placeholder="e.g. Karol Bagh transporter"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
             <div class="flex-1 min-w-[160px]">
                 <input id="rw-slot-${o.id}" type="text" value="${escapeHtml(o.rickshaw_slot || '')}"
-                    onblur="handleRickshawAssign('${o.id}')" placeholder="e.g. Slot 1 / Morning trip"
+                    placeholder="e.g. Slot 1 / Morning trip"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="w-24 flex-shrink-0 flex items-center gap-1.5">
-                <button onclick="handleRickshawAssign('${o.id}', true)" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition flex-shrink-0">
+            <div class="w-56 flex-shrink-0 flex items-center gap-1.5">
+                <button onclick="handleRickshawAssign('${o.id}')" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition flex-shrink-0">
                     <i data-lucide="save" class="w-3 h-3"></i> Save
+                </button>
+                <button onclick="markRickshawReached('${o.id}')" class="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-md flex items-center gap-1 transition shadow flex-shrink-0">
+                    <i data-lucide="map-pin-check" class="w-3 h-3"></i> Reached
                 </button>
                 <span id="rw-saved-${o.id}" class="text-emerald-600 flex-shrink-0 opacity-0 transition-opacity duration-300 pointer-events-none">
                     <i data-lucide="check-circle-2" class="w-4 h-4"></i>
@@ -3520,7 +3523,7 @@ async function renderRickshawDispatch(container) {
             <div class="w-36 flex-shrink-0">Rickshaw Wala</div>
             <div class="flex-1 min-w-[160px]">Location</div>
             <div class="flex-1 min-w-[160px]">Slot</div>
-            <div class="w-24 flex-shrink-0">Save</div>
+            <div class="w-56 flex-shrink-0">Actions</div>
         </div>`;
 
     const unassignedSection = unassigned.length ? `
@@ -3551,11 +3554,11 @@ async function renderRickshawDispatch(container) {
         <div class="max-w-5xl mx-auto animate-in">
             <div class="mb-6">
                 <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Rickshaw Dispatch</h2>
-                <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot. Orders are grouped by driver, then by trip — orders in the same "Trip" section travelled together; separate sections mean separate trips.</p>
+                <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot, then click Save to store changes. Orders are grouped by driver, then by trip — orders in the same "Trip" section travelled together; separate sections mean separate trips. Click Reached once the rickshaw has handed the order off.</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="overflow-x-auto">
-                <div class="min-w-[1080px]">
+                <div class="min-w-[1200px]">
                 ${headerRow}
                 ${orders.length === 0
                     ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>`
@@ -3567,26 +3570,34 @@ async function renderRickshawDispatch(container) {
     lucide.createIcons();
 }
 
-window.handleRickshawAssign = async function(orderId, showInlineConfirm) {
+// Only ever called from the row's Save button — no auto-save on
+// change/blur, so a click into a field and back out doesn't silently save.
+window.handleRickshawAssign = async function(orderId) {
     const wala = document.getElementById(`rw-wala-${orderId}`)?.value || '';
     const location = document.getElementById(`rw-loc-${orderId}`)?.value.trim() || '';
     const slot = document.getElementById(`rw-slot-${orderId}`)?.value.trim() || '';
     try {
         await window.db.assignRickshawTrip(orderId, wala || null, location || null, slot || null);
-        if (showInlineConfirm) {
-            const badge = document.getElementById(`rw-saved-${orderId}`);
-            if (badge) {
-                badge.classList.remove('opacity-0');
-                badge.classList.add('opacity-100');
-                clearTimeout(badge._rwHideTimer);
-                badge._rwHideTimer = setTimeout(() => {
-                    badge.classList.remove('opacity-100');
-                    badge.classList.add('opacity-0');
-                }, 1500);
-            }
-        } else {
-            showToast('Rickshaw dispatch updated', 'success');
+        const badge = document.getElementById(`rw-saved-${orderId}`);
+        if (badge) {
+            badge.classList.remove('opacity-0');
+            badge.classList.add('opacity-100');
+            clearTimeout(badge._rwHideTimer);
+            badge._rwHideTimer = setTimeout(() => {
+                badge.classList.remove('opacity-100');
+                badge.classList.add('opacity-0');
+            }, 1500);
         }
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+};
+
+window.markRickshawReached = async function(orderId) {
+    try {
+        await window.db.markRickshawReached(orderId);
+        showToast('Marked as reached', 'success');
+        renderRickshawDispatch(document.getElementById('main-content'));
     } catch (err) {
         showToast(err.message, 'error');
     }
