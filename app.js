@@ -1239,7 +1239,9 @@ function renderDrawerContent(order, steps, nextStep, subMap) {
             </div>`;
     }
 
-    const intakeCard = order.delivery_challan_file ? `
+    const step1FileUrl = subMap['STEP1_ORDER_RECEIVED']?.form_data?.file_url;
+
+    const intakeCard = step1FileUrl ? `
         <div class="px-5 pb-3">
             <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Stage 1 · Order Intake</div>
             <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
@@ -1247,12 +1249,12 @@ function renderDrawerContent(order, steps, nextStep, subMap) {
                     <i data-lucide="check" class="w-4 h-4 text-white"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="font-bold text-sm text-gray-900">Order Created</div>
-                    <div class="text-[11px] text-emerald-700 mt-0.5">${order.order_date ? new Date(order.order_date).toLocaleString() : ''}</div>
+                    <div class="font-bold text-sm text-gray-900">Order Document Attached</div>
+                    <div class="text-[11px] text-emerald-700 mt-0.5">Stored inside secure registry</div>
                 </div>
-                <button onclick="previewFile('${order.delivery_challan_file}', 'Delivery Challan — ${order.order_code}')" class="text-xs text-indigo-600 hover:underline font-semibold flex items-center gap-1">
-    <i data-lucide="eye" class="w-3 h-3"></i> View Challan
-</button>
+                <button onclick="previewFile('${step1FileUrl}', 'Sales Order — ${order.order_code}')" class="text-xs text-indigo-600 hover:underline font-semibold flex items-center gap-1">
+                    <i data-lucide="eye" class="w-3 h-3"></i> View Order Doc
+                </button>
             </div>
         </div>` : '';
 
@@ -4812,15 +4814,17 @@ window.submitEditOrderForm = async function(e, orderId) {
         const fileInput = document.getElementById('eo_pi_file');
         if (fileInput && fileInput.files.length > 0) {
             const uploadedUrl = await window.db.uploadFile('bmh-proofs', fileInput.files[0]);
-            updateData.delivery_challan_file = uploadedUrl;
             
-            // Register file evidence to Step 1 without modifying workflow timelines
+            // Clean up old step 1 records to maintain single pristine reference state
+            await window.db.supabase.from('step_submissions')
+                .update({ is_latest: false })
+                .eq('order_id', orderId)
+                .eq('step_code', 'STEP1_ORDER_RECEIVED');
+
+            // Register file evidence into step_submissions safely without modifying main table cache fields
             await window.db.attachStep1Evidence(orderId, uploadedUrl, currentUser.id);
         }
 
-// ========================================================================
-// REPLACE: The final try/catch resolution block inside window.submitEditOrderForm
-// ========================================================================
         const { error } = await window.db.supabase
             .from('orders')
             .update(updateData)
