@@ -1014,17 +1014,42 @@ async function renderNewOrder(container) {
 // ==========================================
 // 🎯 ORDER DETAIL DRAWER
 // ==========================================
+// ========================================================================
+// REPLACE: Entire window.openOrderDrawer definition in app.js
+// ========================================================================
 window.openOrderDrawer = async function(orderId) {
-    const order = await window.db.getOrderDetail(orderId);
-    if (!order) return showToast('Order not found', 'error');
-    
-    // Always render drawer at body level — escapes any parent layout issues
+    if (!orderId) return;
+
+    // Check if the drawer panel is already open for this specific order
+    const existingDrawer = document.getElementById('order-drawer');
+    if (existingDrawer && existingDrawer.dataset.orderId === orderId) {
+        // Perform a quiet, in-place update without wiping the overlay or re-triggering slide animations
+        try {
+            const { order, steps } = await window.db.getOrderDetail(orderId);
+            if (!order) return;
+
+            const stepsSorted = (steps || []).slice().sort((a, b) => {
+                return stepsDirectory.indexOf(a.step_code) - stepsDirectory.indexOf(b.step_code);
+            });
+            const nextStep = stepsSorted.find(s => s.status !== 'DONE' && s.status !== 'SKIPPED');
+            const submissions = await window.db.getOrderSubmissions(orderId);
+            const subMap = {};
+            (submissions || []).forEach(s => { if (s.is_latest) subMap[s.step_code] = s; });
+
+            existingDrawer.innerHTML = renderDrawerContent(order, stepsSorted, nextStep, subMap);
+            lucide.createIcons();
+            return; // Terminate execution early to avoid re-drawing components
+        } catch (silentErr) {
+            console.error('Silently updating open drawer matrix caught:', silentErr);
+        }
+    }
+
+    // Baseline Generation Route: Create structural tokens if drawer is closed
     let root = document.getElementById('drawer-root-body');
     if (!root) {
         document.body.insertAdjacentHTML('beforeend', '<div id="drawer-root-body"></div>');
         root = document.getElementById('drawer-root-body');
     }
-
     root.innerHTML = `
         <div id="drawer-overlay" class="drawer-overlay" onclick="closeOrderDrawer()"></div>
         <aside id="order-drawer" data-order-id="${orderId}" class="drawer-panel">
@@ -1032,7 +1057,7 @@ window.openOrderDrawer = async function(orderId) {
                 <div class="spinner"></div>
             </div>
         </aside>`;
-
+        
     requestAnimationFrame(() => {
         document.getElementById('drawer-overlay')?.classList.add('open');
         document.getElementById('order-drawer')?.classList.add('open');
@@ -1044,20 +1069,14 @@ window.openOrderDrawer = async function(orderId) {
             document.getElementById('order-drawer').innerHTML = `<div class="p-8 text-center text-red-500 font-bold">Order not found</div>`;
             return;
         }
-
-        if (!steps || steps.length === 0) {
-            console.warn('No step rows returned for order ' + orderId);
-        }
-
         const stepsSorted = (steps || []).slice().sort((a, b) => {
             return stepsDirectory.indexOf(a.step_code) - stepsDirectory.indexOf(b.step_code);
         });
-
         const nextStep = stepsSorted.find(s => s.status !== 'DONE' && s.status !== 'SKIPPED');
         const submissions = await window.db.getOrderSubmissions(orderId);
         const subMap = {};
         (submissions || []).forEach(s => { if (s.is_latest) subMap[s.step_code] = s; });
-
+        
         document.getElementById('order-drawer').innerHTML = renderDrawerContent(order, stepsSorted, nextStep, subMap);
         lucide.createIcons();
     } catch (err) {
@@ -4799,6 +4818,9 @@ window.submitEditOrderForm = async function(e, orderId) {
             await window.db.attachStep1Evidence(orderId, uploadedUrl, currentUser.id);
         }
 
+// ========================================================================
+// REPLACE: The final try/catch resolution block inside window.submitEditOrderForm
+// ========================================================================
         const { error } = await window.db.supabase
             .from('orders')
             .update(updateData)
@@ -4808,9 +4830,17 @@ window.submitEditOrderForm = async function(e, orderId) {
 
         showToast('Order variables synchronized successfully!', 'success');
         closeEditOrderModal();
-        openOrderDrawer(orderId); // Refresh open drawer views automatically
         
-        if (['#/orders', '#/dashboard', '#/board'].includes(location.hash)) router();
+        // 1. Force the smart drawer engine to execute an instantaneous content refresh
+        await openOrderDrawer(orderId);
+        
+        // 2. Clear underlying table caches instantly by forcing active page view re-renders
+        if (location.hash === '#/orders') {
+            const main = document.getElementById('main-content');
+            if (main) await renderOrders(main);
+        } else if (['#/dashboard', '#/board'].includes(location.hash)) {
+            router();
+        }
     } catch (err) {
         console.error(err);
         showToast(err.message || 'Error writing updates to storage engine', 'error');
