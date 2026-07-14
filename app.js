@@ -1420,7 +1420,15 @@ function renderDrawerStep(step, order, latestSub) {
         </div>`;
 }
 
+// ========================================================================
+// REPLACE: The start of window.openStepModal to intercept Step 1
+// ========================================================================
 window.openStepModal = function(orderId, stepCode) {
+    // If Step 1 is targeted, intercept and redirect to the master details editor
+    if (stepCode === 'STEP1_ORDER_RECEIVED') {
+        return openEditOrderModal(orderId);
+    }
+
     let container = document.getElementById('step-modal-container');
     if (!container) {
         document.body.insertAdjacentHTML('beforeend', '<div id="step-modal-container"></div>');
@@ -4686,6 +4694,12 @@ window.openEditOrderModal = async function(orderId) {
                             <input type="text" id="eo_sales_custom" value="${isSalesCustom ? escapeHtml(order.sales_person_name) : ''}" placeholder="Enter referrer name..." style="display:${isSalesCustom ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
 
+                        <div class="pt-2">
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Sales Order / Order Document (optional)</label>
+                            <input type="file" id="eo_pi_file" accept="image/*,.pdf" class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50 outline-none">
+                            <p class="text-[11px] text-gray-400 mt-1">Attaching a file updates your primary sales record and synchronizes Step 1 data safely without moving milestone markers.</p>
+                        </div>
+
                         <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-gray-100">
                             <button type="button" onclick="closeEditOrderModal()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
                             <button type="submit" id="edit_order_submit_btn" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md flex items-center gap-2">
@@ -4738,6 +4752,9 @@ window.handleEditSalesChange = function(el) {
     }
 };
 
+// ========================================================================
+// REPLACE: window.submitEditOrderForm definition
+// ========================================================================
 window.submitEditOrderForm = async function(e, orderId) {
     e.preventDefault();
     const btn = document.getElementById('edit_order_submit_btn');
@@ -4772,6 +4789,16 @@ window.submitEditOrderForm = async function(e, orderId) {
             sales_person_name: salesValue
         };
 
+        // Check if an order document/file is being uploaded dynamically
+        const fileInput = document.getElementById('eo_pi_file');
+        if (fileInput && fileInput.files.length > 0) {
+            const uploadedUrl = await window.db.uploadFile('bmh-proofs', fileInput.files[0]);
+            updateData.delivery_challan_file = uploadedUrl;
+            
+            // Register file evidence to Step 1 without modifying workflow timelines
+            await window.db.attachStep1Evidence(orderId, uploadedUrl, currentUser.id);
+        }
+
         const { error } = await window.db.supabase
             .from('orders')
             .update(updateData)
@@ -4781,7 +4808,7 @@ window.submitEditOrderForm = async function(e, orderId) {
 
         showToast('Order variables synchronized successfully!', 'success');
         closeEditOrderModal();
-        openOrderDrawer(orderId); // Refresh layout variables inside the open drawer dynamically
+        openOrderDrawer(orderId); // Refresh open drawer views automatically
         
         if (['#/orders', '#/dashboard', '#/board'].includes(location.hash)) router();
     } catch (err) {
