@@ -339,6 +339,10 @@ function renderTopbar() {
                 </div>
             </div>
             <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light / dark mode"
+                        class="p-2 bg-gray-100 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-200 transition flex items-center justify-center">
+                    <i data-lucide="${isDarkMode() ? 'sun' : 'moon'}" class="w-4 h-4"></i>
+                </button>
                 <button onclick="toggleLanguage()" class="px-2.5 sm:px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-xs sm:text-sm font-semibold hover:bg-gray-200 transition">
                     ${lang === 'hi' ? 'EN' : 'हिंदी'}
                 </button>
@@ -1677,6 +1681,26 @@ window.toggleLanguage = function() {
     const current = localStorage.getItem('mmc_lang') || 'en';
     localStorage.setItem('mmc_lang', current === 'en' ? 'hi' : 'en');
     router();
+};
+
+// ==========================================
+// 🌗 LIGHT / DARK THEME
+// ==========================================
+// index.html applies the saved/system theme before first paint (no flash);
+// this just handles the runtime toggle + persistence once app.js is loaded.
+function isDarkMode() {
+    return document.documentElement.classList.contains('dark');
+}
+
+window.toggleTheme = function() {
+    const next = !isDarkMode();
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('bmh_theme', next ? 'dark' : 'light');
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+        btn.innerHTML = `<i data-lucide="${next ? 'sun' : 'moon'}" class="w-4 h-4"></i>`;
+        lucide.createIcons();
+    }
 };
 
 // Shared by the New Order form and the WhatsApp Orders review page —
