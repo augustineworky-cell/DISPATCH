@@ -1015,7 +1015,7 @@ async function renderNewOrder(container) {
 // 🎯 ORDER DETAIL DRAWER
 // ==========================================
 // ========================================================================
-// REPLACE: Entire window.openOrderDrawer definition in app.js
+// REPLACE ENTIRELY: window.openOrderDrawer inside app.js
 // ========================================================================
 window.openOrderDrawer = async function(orderId) {
     if (!orderId) return;
@@ -1032,13 +1032,19 @@ window.openOrderDrawer = async function(orderId) {
                 return stepsDirectory.indexOf(a.step_code) - stepsDirectory.indexOf(b.step_code);
             });
             const nextStep = stepsSorted.find(s => s.status !== 'DONE' && s.status !== 'SKIPPED');
+            
+            // FIX: Prioritize the absolute newest upload from the DESC sorted array
             const submissions = await window.db.getOrderSubmissions(orderId);
             const subMap = {};
-            (submissions || []).forEach(s => { if (s.is_latest) subMap[s.step_code] = s; });
+            (submissions || []).forEach(s => { 
+                if (!subMap[s.step_code]) {
+                    subMap[s.step_code] = s; 
+                }
+            });
 
             existingDrawer.innerHTML = renderDrawerContent(order, stepsSorted, nextStep, subMap);
             lucide.createIcons();
-            return; // Terminate execution early to avoid re-drawing components
+            return; 
         } catch (silentErr) {
             console.error('Silently updating open drawer matrix caught:', silentErr);
         }
@@ -1073,9 +1079,15 @@ window.openOrderDrawer = async function(orderId) {
             return stepsDirectory.indexOf(a.step_code) - stepsDirectory.indexOf(b.step_code);
         });
         const nextStep = stepsSorted.find(s => s.status !== 'DONE' && s.status !== 'SKIPPED');
+        
+        // FIX: Prioritize the absolute newest upload from the DESC sorted array
         const submissions = await window.db.getOrderSubmissions(orderId);
         const subMap = {};
-        (submissions || []).forEach(s => { if (s.is_latest) subMap[s.step_code] = s; });
+        (submissions || []).forEach(s => { 
+            if (!subMap[s.step_code]) {
+                subMap[s.step_code] = s; 
+            }
+        });
         
         document.getElementById('order-drawer').innerHTML = renderDrawerContent(order, stepsSorted, nextStep, subMap);
         lucide.createIcons();
@@ -1261,7 +1273,13 @@ function renderDrawerContent(order, steps, nextStep, subMap) {
     const stepsTimeline = `
         <div class="px-5 pb-5 space-y-3">
             <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Workflow Steps</div>
-            ${visibleSteps.map(s => renderDrawerStep(s, order, subMap[s.step_code])).join('')}
+            ${visibleSteps.map((s, idx) => {
+                // A step is locked if any prior step (excluding the auto-done STEP1) isn't DONE yet —
+                // prevents jumping ahead in the workflow (e.g. Packing before Payment Confirmed).
+                const priorPending = visibleSteps.slice(0, idx).find(p => p.step_code !== 'STEP1_ORDER_RECEIVED' && p.status !== 'DONE');
+                const isLocked = s.step_code !== 'STEP1_ORDER_RECEIVED' && !!priorPending;
+                return renderDrawerStep(s, order, subMap[s.step_code], isLocked, priorPending ? stepName(priorPending.step_code) : '');
+            }).join('')}
         </div>`;
 
     const shareCard = order.is_cancelled ? '' : `
@@ -1286,7 +1304,7 @@ function renderDrawerContent(order, steps, nextStep, subMap) {
     return `${header}<div class="drawer-body">${summaryCard}${nextActionCard}${shareCard}${intakeCard}${stepsTimeline}</div>`;
 }
 
-function renderDrawerStep(step, order, latestSub) {
+function renderDrawerStep(step, order, latestSub, isLocked = false, lockedOnStepName = '') {
     const code = step.step_code;
     const cfg = stepLabels[code] || {};
     const orderId = order.id;
@@ -1407,13 +1425,21 @@ function renderDrawerStep(step, order, latestSub) {
 
     const btnIcon = cfg.needsEvidence ? 'upload' : 'edit-3';
     const btnLabel = isDone ? (cfg.needsEvidence ? 'Replace' : 'Update') : (cfg.needsEvidence ? 'Upload Evidence' : 'Submit Info');
-    const actionBtn = isDone
-        ? `<button onclick="openStepModal('${orderId}', '${code}', '${order.type_of_order || ''}')" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition">
+    let actionBtn;
+    if (isDone) {
+        actionBtn = `<button onclick="openStepModal('${orderId}', '${code}', '${order.type_of_order || ''}')" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition">
               <i data-lucide="refresh-cw" class="w-3 h-3"></i> ${btnLabel}
-          </button>`
-        : `<button onclick="openStepModal('${orderId}', '${code}', '${order.type_of_order || ''}')" class="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md flex items-center gap-1 transition shadow">
+          </button>`;
+    } else if (isLocked) {
+        // Genuine functional lock: no onclick attached at all, so openStepModal() can never fire for a locked step.
+        actionBtn = `<button type="button" disabled title="Complete '${escapeHtml(lockedOnStepName)}' first" class="text-xs font-bold text-gray-400 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-md flex items-center gap-1 opacity-60 cursor-not-allowed">
+              <i data-lucide="lock" class="w-3 h-3"></i> ${btnLabel}
+          </button>`;
+    } else {
+        actionBtn = `<button onclick="openStepModal('${orderId}', '${code}', '${order.type_of_order || ''}')" class="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md flex items-center gap-1 transition shadow">
               <i data-lucide="${btnIcon}" class="w-3 h-3"></i> ${btnLabel}
           </button>`;
+    }
 
     return `
         <div class="bg-white border ${isDelayed ? 'border-red-300 bg-red-50/30' : 'border-gray-200'} rounded-xl p-3 transition hover:shadow-sm">
@@ -1429,7 +1455,10 @@ function renderDrawerStep(step, order, latestSub) {
                             <span class="font-bold text-sm text-gray-900">${stepName(code)}</span>
                             ${statusBadge}
                         </div>
-                        <div class="text-[10px] text-gray-400 font-mono mt-0.5">Stage ${stepNumber}</div>
+                        <div class="text-[10px] text-gray-400 font-mono mt-0.5 flex items-center gap-2">
+                            <span>Stage ${stepNumber}</span>
+                            ${cfg.slaHours ? `<span class="inline-flex items-center gap-0.5">⏱ Lead Time: ${cfg.slaHours}h</span>` : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="flex-shrink-0">${actionBtn}</div>
@@ -3508,47 +3537,47 @@ function renderRickshawOrderRow(o, tint) {
     // as "Separate", per spec: no third state for legacy text.
     const isTogether = o.rickshaw_slot === 'TOGETHER';
     return `
-        <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-50 ${tint ? `${tint.bg} border-l-4 ${tint.border}` : ''}" data-order-row="${o.id}">
-            <div class="w-28 flex-shrink-0">
+        <div class="flex items-center gap-1 px-3 py-2.5 border-b border-gray-50 ${tint ? `${tint.bg} border-l-4 ${tint.border}` : ''}" data-order-row="${o.id}">
+            <div class="w-20 flex-shrink-0">
                 <p class="font-bold text-sm text-gray-900 truncate">${o.order_code}</p>
             </div>
-            <div class="w-36 flex-shrink-0 text-sm text-gray-700 truncate">${escapeHtml(o.customer_name)}</div>
-            <div class="w-32 flex-shrink-0">
+            <div class="w-24 flex-shrink-0 text-sm text-gray-700 truncate">${escapeHtml(o.customer_name)}</div>
+            <div class="w-24 flex-shrink-0">
                 <span class="text-[11px] font-bold px-2 py-1 rounded bg-gray-100 text-gray-500 inline-block truncate max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
             </div>
-            <div class="w-28 flex-shrink-0">
+            <div class="w-20 flex-shrink-0">
                 <input id="rw-pi-${o.id}" type="text" value="${escapeHtml(o.pi_number || '')}"
                     placeholder="PI number"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="w-36 flex-shrink-0">
+            <div class="w-24 flex-shrink-0">
                 <select id="rw-wala-${o.id}" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
                     <option value="" ${!o.rickshaw_wala ? 'selected' : ''}>Unassigned</option>
                     ${RICKSHAW_WALA_NAMES.map(n => `<option value="${n}" ${o.rickshaw_wala === n ? 'selected' : ''}>${n}</option>`).join('')}
                 </select>
             </div>
-            <div class="flex-1 min-w-[150px]">
+            <div class="flex-1 min-w-[110px]">
                 <input id="rw-loc-${o.id}" type="text" value="${escapeHtml(o.rickshaw_location || '')}"
                     placeholder="e.g. Karol Bagh transporter"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="w-24 flex-shrink-0">
+            <div class="w-20 flex-shrink-0">
                 <input id="rw-fare-${o.id}" type="number" min="0" step="0.01" value="${o.rickshaw_fare ?? ''}"
                     placeholder="₹"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="w-28 flex-shrink-0">
+            <div class="w-24 flex-shrink-0">
                 <select id="rw-slot-${o.id}" data-order-code="${escapeHtml(o.order_code)}" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
                     <option value="TOGETHER" ${isTogether ? 'selected' : ''}>Together</option>
                     <option value="SEPARATE" ${!isTogether ? 'selected' : ''}>Separate</option>
                 </select>
             </div>
-            <div class="flex-1 min-w-[140px]">
+            <div class="flex-1 min-w-[120px]">
                 <input id="rw-transport-${o.id}" type="text" value="${escapeHtml(o.transport_name || '')}"
                     placeholder="e.g. Shree Balaji Transport"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="w-56 flex-shrink-0 flex items-center gap-1.5 sticky right-0 z-10 border-l border-gray-200 pl-2 -mr-5 pr-5 ${tint ? tint.bg : 'bg-white'}">
+            <div class="w-56 flex-shrink-0 flex items-center gap-1.5 sticky right-0 z-10 border-l border-gray-200 pl-2 -mr-3 pr-3 ${tint ? tint.bg : 'bg-white'}">
                 <button onclick="handleRickshawAssign('${o.id}')" class="text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 px-2.5 py-1 rounded-md flex items-center gap-1 transition flex-shrink-0">
                     <i data-lucide="save" class="w-3 h-3"></i> Save
                 </button>
@@ -3578,7 +3607,7 @@ function renderRickshawTripSections(driverOrders, color) {
     Object.keys(bySlot).forEach(slot => {
         const list = bySlot[slot];
         html += `
-            <div class="px-5 pt-3 pb-1.5 flex items-center gap-1.5">
+            <div class="px-3 pt-3 pb-1.5 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full ${color.dot} flex-shrink-0"></span>
                 <span class="text-[11px] font-bold ${color.text} uppercase tracking-wide">Trip: ${escapeHtml(slot)} — ${list.length} order${list.length === 1 ? '' : 's'} travelling together</span>
             </div>
@@ -3586,7 +3615,7 @@ function renderRickshawTripSections(driverOrders, color) {
     });
     noSlot.forEach(o => {
         html += `
-            <div class="px-5 pt-3 pb-1.5 flex items-center gap-1.5">
+            <div class="px-3 pt-3 pb-1.5 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></span>
                 <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Separate trip (no slot set)</span>
             </div>
@@ -3624,22 +3653,22 @@ async function renderRickshawDispatch(container) {
     Object.keys(byDriver).forEach(n => { if (!driversInOrder.includes(n)) driversInOrder.push(n); });
 
     const headerRow = `
-        <div class="flex items-center gap-2 px-5 py-3 bg-gray-100 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-            <div class="w-28 flex-shrink-0">Order</div>
-            <div class="w-36 flex-shrink-0">Customer</div>
-            <div class="w-32 flex-shrink-0">Current Step</div>
-            <div class="w-28 flex-shrink-0">PI Number</div>
-            <div class="w-36 flex-shrink-0">Rickshaw Wala</div>
-            <div class="flex-1 min-w-[150px]">Location</div>
-            <div class="w-24 flex-shrink-0">Fare Charges</div>
-            <div class="w-28 flex-shrink-0">Slot</div>
-            <div class="flex-1 min-w-[140px]">Transport Name</div>
-            <div class="w-56 flex-shrink-0 sticky right-0 z-10 bg-gray-100 border-l border-gray-200 pl-2 -mr-5 pr-5">Actions</div>
+        <div class="flex items-center gap-1 px-3 py-2.5 bg-gray-100 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+            <div class="w-20 flex-shrink-0">Order</div>
+            <div class="w-24 flex-shrink-0">Customer</div>
+            <div class="w-24 flex-shrink-0">Current Step</div>
+            <div class="w-20 flex-shrink-0">PI Number</div>
+            <div class="w-24 flex-shrink-0">Rickshaw Wala</div>
+            <div class="flex-1 min-w-[110px]">Location</div>
+            <div class="w-20 flex-shrink-0">Fare Charges</div>
+            <div class="w-24 flex-shrink-0">Slot</div>
+            <div class="flex-1 min-w-[120px]">Transport Name</div>
+            <div class="w-56 flex-shrink-0 sticky right-0 z-10 bg-gray-100 border-l border-gray-200 pl-2 -mr-3 pr-3">Actions</div>
         </div>`;
 
     const unassignedSection = unassigned.length ? `
         <div class="border-b border-gray-100">
-            <div class="px-5 py-2.5 bg-gray-50 flex items-center gap-2">
+            <div class="px-3 py-2.5 bg-gray-50 flex items-center gap-2">
                 <i data-lucide="help-circle" class="w-4 h-4 text-gray-400"></i>
                 <span class="text-xs font-extrabold text-gray-500 uppercase tracking-wider">Unassigned</span>
                 <span class="text-[11px] text-gray-400 font-semibold">— ${unassigned.length} order${unassigned.length === 1 ? '' : 's'}</span>
@@ -3652,7 +3681,7 @@ async function renderRickshawDispatch(container) {
         const list = byDriver[driver];
         return `
         <div class="border-b border-gray-100">
-            <div class="px-5 py-2.5 bg-gray-50 flex items-center gap-2">
+            <div class="px-3 py-2.5 bg-gray-50 flex items-center gap-2">
                 <i data-lucide="bike" class="w-4 h-4 ${color.text}"></i>
                 <span class="text-xs font-extrabold text-gray-700">${escapeHtml(driver)}</span>
                 <span class="text-[11px] text-gray-400 font-semibold">— ${list.length} order${list.length === 1 ? '' : 's'}</span>
@@ -3662,14 +3691,14 @@ async function renderRickshawDispatch(container) {
     }).join('');
 
     container.innerHTML = `
-        <div class="max-w-5xl mx-auto animate-in">
+        <div class="w-full animate-in">
             <div class="mb-6">
                 <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Rickshaw Dispatch</h2>
                 <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot, then click Save to store changes. Orders are grouped by driver, then by trip — orders in the same "Trip" section travelled together; separate sections mean separate trips. Click Reached once the rickshaw has handed the order off.</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="overflow-x-auto">
-                <div class="min-w-[1550px]">
+                <div class="min-w-[1150px]">
                 ${headerRow}
                 ${orders.length === 0
                     ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>`
@@ -4031,28 +4060,28 @@ async function renderPaymentStatus(container) {
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             ${list.length === 0 ? `<div class="p-8 text-center text-gray-400 text-sm">No orders here.</div>` : `
             <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm whitespace-nowrap">
+            <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
                     <tr>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">${t('order_code')}</th>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Customer</th>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">City</th>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">State</th>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Referred By</th>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Current Step</th>
-                        <th class="px-5 py-2.5 uppercase tracking-wider text-[11px] font-bold">Payment Term</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">${t('order_code')}</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Customer</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">City</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">State</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Referred By</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Current Step</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Payment Term</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     ${list.map(o => `
                         <tr class="hover:bg-indigo-50/50 cursor-pointer" onclick="openOrderDrawer('${o.id}')">
-                            <td class="px-5 py-3 font-mono text-indigo-600 font-bold">${o.order_code}</td>
-                            <td class="px-5 py-3 font-semibold text-gray-900">${escapeHtml(o.customer_name)}</td>
-                            <td class="px-5 py-3 text-gray-700">${escapeHtml(o.city) || '—'}</td>
-                            <td class="px-5 py-3 text-gray-700">${escapeHtml(o.state) || '—'}</td>
-                            <td class="px-5 py-3 text-gray-700">${escapeHtml(o.sales_person_name) || '—'}</td>
-                            <td class="px-5 py-3"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
-                            <td class="px-5 py-3">${paymentTermBadge(o.payment_term)}</td>
+                            <td class="px-3 py-3 font-mono text-indigo-600 font-bold whitespace-nowrap">${o.order_code}</td>
+                            <td class="px-3 py-3 font-semibold text-gray-900">${escapeHtml(o.customer_name)}</td>
+                            <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.city) || '—'}</td>
+                            <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.state) || '—'}</td>
+                            <td class="px-3 py-3 text-gray-700">${escapeHtml(o.sales_person_name) || '—'}</td>
+                            <td class="px-3 py-3 max-w-[220px]"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded inline-block">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
+                            <td class="px-3 py-3 whitespace-nowrap">${paymentTermBadge(o.payment_term)}</td>
                         </tr>`).join('')}
                 </tbody>
             </table>
@@ -4060,7 +4089,7 @@ async function renderPaymentStatus(container) {
         </div>`;
 
     container.innerHTML = `
-        <div class="max-w-5xl mx-auto animate-in space-y-8">
+        <div class="w-full animate-in space-y-8">
             <div>
                 <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Payment Status</h2>
                 <p class="text-sm text-gray-500 mt-1">Paid (advance) orders should be prioritized for packing/dispatch over credit orders.</p>
