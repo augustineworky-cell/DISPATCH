@@ -266,7 +266,10 @@ function renderSidebar() {
         <aside id="app-sidebar" class="w-64 sidebar-gradient text-white flex flex-col h-full shadow-xl z-40 fixed md:static inset-y-0 left-0 -translate-x-full md:translate-x-0 transition-transform duration-200 ease-out">
             <div class="p-4 sm:p-6 flex items-center gap-3 border-b border-white/10">
                 <img src="/web-app-manifest-192x192.png" alt="Bansal Material House" class="w-10 h-10 rounded-lg flex-shrink-0">
-                <h1 class="font-bold text-lg sm:text-xl tracking-tight text-white leading-tight">Bansal Material House Dispatch</h1>
+                <div class="min-w-0">
+                    <h1 class="font-bold text-lg sm:text-xl tracking-tight text-white leading-tight truncate">Bansal Material House</h1>
+                    <p class="text-indigo-300 text-[10px] sm:text-xs font-semibold tracking-widest uppercase">Order to Dispatch</p>
+                </div>
                 <button onclick="closeSidebarMobile()" class="md:hidden ml-auto flex-shrink-0 text-white/60 hover:text-white p-1 -mr-1" aria-label="Close menu">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
@@ -455,6 +458,13 @@ function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+const ROLE_DISPLAY_NAMES = { admin: 'Admin', manager: 'Manager', crm: 'CRM', sales: 'Sales' };
+function formatRoleName(role) {
+    if (!role) return '';
+    if (ROLE_DISPLAY_NAMES[role]) return ROLE_DISPLAY_NAMES[role];
+    return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // ==========================================
 // LOGIN
 // ==========================================
@@ -607,9 +617,8 @@ async function renderDashboard(container) {
 
     const kData = Array.isArray(kpis) ? kpis[0] : (kpis || {});
     
-    // Safety check for user names
-    const safeName = (currentUser && currentUser.full_name && currentUser.full_name !== 'undefined') 
-        ? currentUser.full_name.split(' ')[0] : 'there';
+    // Greeting shows the user's role rather than their name.
+    const roleLabel = formatRoleName(currentUser?.role) || 'there';
 
     // Parse KPI metrics safely
     const totalOrders = kData.total_orders || kData.totalOrders || 0;
@@ -685,13 +694,13 @@ async function renderDashboard(container) {
     container.innerHTML = `
         <div class="max-w-7xl mx-auto space-y-6 animate-in">
             <div>
-                <h1 class="text-2xl font-extrabold tracking-tight">Good morning, ${safeName} 👋</h1>
+                <h1 class="text-2xl font-extrabold tracking-tight">Good morning, ${roleLabel} 👋</h1>
                 <p class="text-sm text-gray-500 mt-1">Here's what's happening with your dispatches today.</p>
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                ${kpiCard('Active Value', '₹' + formatINR(financials.pipelineRevenue || 0), 'wallet', '#8b5cf6', false)}
-                ${kpiCard('Dispatched Value', '₹' + formatINR(financials.dispatchedToday || 0), 'trending-up', '#059669', false)}
+                ${kpiCard('Total Order Value', '₹' + formatINR(financials.pipelineRevenue || 0), 'wallet', '#8b5cf6', false)}
+                ${kpiCard('Total Dispatch Value', '₹' + formatINR(financials.dispatchedToday || 0), 'trending-up', '#059669', false)}
                 ${kpiCard(t('total_orders'), totalOrders, 'package', '#4f46e5', false)}
                 ${kpiCard(t('dispatched_today'), dispatched, 'check-circle-2', '#059669', false)}
                 ${kpiCard(t('in_progress'), inProgress, 'loader-2', '#2563eb', false)}
@@ -3440,6 +3449,10 @@ const RICKSHAW_GROUP_COLORS = [
 ];
 
 function renderRickshawOrderRow(o, tint) {
+    // Anything other than the exact 'TOGETHER' sentinel — including empty/
+    // null or old free-text values from before this toggle existed — reads
+    // as "Separate", per spec: no third state for legacy text.
+    const isTogether = o.rickshaw_slot === 'TOGETHER';
     return `
         <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-50 ${tint ? `${tint.bg} border-l-4 ${tint.border}` : ''}" data-order-row="${o.id}">
             <div class="w-28 flex-shrink-0">
@@ -3449,20 +3462,36 @@ function renderRickshawOrderRow(o, tint) {
             <div class="w-32 flex-shrink-0">
                 <span class="text-[11px] font-bold px-2 py-1 rounded bg-gray-100 text-gray-500 inline-block truncate max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
             </div>
+            <div class="w-28 flex-shrink-0">
+                <input id="rw-pi-${o.id}" type="text" value="${escapeHtml(o.pi_number || '')}"
+                    placeholder="PI number"
+                    class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+            </div>
             <div class="w-36 flex-shrink-0">
                 <select id="rw-wala-${o.id}" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
                     <option value="" ${!o.rickshaw_wala ? 'selected' : ''}>Unassigned</option>
                     ${RICKSHAW_WALA_NAMES.map(n => `<option value="${n}" ${o.rickshaw_wala === n ? 'selected' : ''}>${n}</option>`).join('')}
                 </select>
             </div>
-            <div class="flex-1 min-w-[160px]">
+            <div class="flex-1 min-w-[150px]">
                 <input id="rw-loc-${o.id}" type="text" value="${escapeHtml(o.rickshaw_location || '')}"
                     placeholder="e.g. Karol Bagh transporter"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
-            <div class="flex-1 min-w-[160px]">
-                <input id="rw-slot-${o.id}" type="text" value="${escapeHtml(o.rickshaw_slot || '')}"
-                    placeholder="e.g. Slot 1 / Morning trip"
+            <div class="w-24 flex-shrink-0">
+                <input id="rw-fare-${o.id}" type="number" min="0" step="0.01" value="${o.rickshaw_fare ?? ''}"
+                    placeholder="₹"
+                    class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+            </div>
+            <div class="w-28 flex-shrink-0">
+                <select id="rw-slot-${o.id}" data-order-code="${escapeHtml(o.order_code)}" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                    <option value="TOGETHER" ${isTogether ? 'selected' : ''}>Together</option>
+                    <option value="SEPARATE" ${!isTogether ? 'selected' : ''}>Separate</option>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[140px]">
+                <input id="rw-transport-${o.id}" type="text" value="${escapeHtml(o.transport_name || '')}"
+                    placeholder="e.g. Shree Balaji Transport"
                     class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
             </div>
             <div class="w-56 flex-shrink-0 flex items-center gap-1.5 sticky right-0 z-10 border-l border-gray-200 pl-2 -mr-5 pr-5 ${tint ? tint.bg : 'bg-white'}">
@@ -3545,9 +3574,12 @@ async function renderRickshawDispatch(container) {
             <div class="w-28 flex-shrink-0">Order</div>
             <div class="w-36 flex-shrink-0">Customer</div>
             <div class="w-32 flex-shrink-0">Current Step</div>
+            <div class="w-28 flex-shrink-0">PI Number</div>
             <div class="w-36 flex-shrink-0">Rickshaw Wala</div>
-            <div class="flex-1 min-w-[160px]">Location</div>
-            <div class="flex-1 min-w-[160px]">Slot</div>
+            <div class="flex-1 min-w-[150px]">Location</div>
+            <div class="w-24 flex-shrink-0">Fare Charges</div>
+            <div class="w-28 flex-shrink-0">Slot</div>
+            <div class="flex-1 min-w-[140px]">Transport Name</div>
             <div class="w-56 flex-shrink-0 sticky right-0 z-10 bg-gray-100 border-l border-gray-200 pl-2 -mr-5 pr-5">Actions</div>
         </div>`;
 
@@ -3583,7 +3615,7 @@ async function renderRickshawDispatch(container) {
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="overflow-x-auto">
-                <div class="min-w-[1200px]">
+                <div class="min-w-[1550px]">
                 ${headerRow}
                 ${orders.length === 0
                     ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>`
@@ -3600,9 +3632,28 @@ async function renderRickshawDispatch(container) {
 window.handleRickshawAssign = async function(orderId) {
     const wala = document.getElementById(`rw-wala-${orderId}`)?.value || '';
     const location = document.getElementById(`rw-loc-${orderId}`)?.value.trim() || '';
-    const slot = document.getElementById(`rw-slot-${orderId}`)?.value.trim() || '';
+    const piNumber = document.getElementById(`rw-pi-${orderId}`)?.value.trim() || '';
+    const transportName = document.getElementById(`rw-transport-${orderId}`)?.value.trim() || '';
+
+    const fareRaw = document.getElementById(`rw-fare-${orderId}`)?.value;
+    const fare = fareRaw !== undefined && fareRaw !== '' ? parseFloat(fareRaw) : null;
+
+    // "Together" is a fixed shared sentinel, so every order under the same
+    // driver set to Together groups into one trip automatically. "Separate"
+    // uses this order's own code so it can never collide with another
+    // order's slot value — it always renders as its own trip section.
+    const slotEl = document.getElementById(`rw-slot-${orderId}`);
+    const slot = slotEl?.value === 'TOGETHER' ? 'TOGETHER' : (slotEl?.dataset.orderCode || orderId);
+
     try {
-        await window.db.assignRickshawTrip(orderId, wala || null, location || null, slot || null);
+        await window.db.assignRickshawTrip(orderId, {
+            rickshawWala: wala || null,
+            location: location || null,
+            slot,
+            piNumber: piNumber || null,
+            fare,
+            transportName: transportName || null
+        });
         const badge = document.getElementById(`rw-saved-${orderId}`);
         if (badge) {
             badge.classList.remove('opacity-0');

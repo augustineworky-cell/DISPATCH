@@ -400,10 +400,17 @@ window.db = {
         return data || [];
     },
 
-    async assignRickshawTrip(orderId, rickshawWala, location, slot) {
+    async assignRickshawTrip(orderId, { rickshawWala, location, slot, piNumber, fare, transportName }) {
         const { error } = await supabaseClient
             .from('orders')
-            .update({ rickshaw_wala: rickshawWala || null, rickshaw_location: location || null, rickshaw_slot: slot || null })
+            .update({
+                rickshaw_wala: rickshawWala || null,
+                rickshaw_location: location || null,
+                rickshaw_slot: slot || null,
+                pi_number: piNumber || null,
+                rickshaw_fare: fare ?? null,
+                transport_name: transportName || null
+            })
             .eq('id', orderId);
         if (error) throw error;
     },
