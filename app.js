@@ -1116,30 +1116,55 @@ function renderDrawerContent(order, steps, nextStep, subMap) {
             </div>
         </div>`;
 
+// ==========================================
+// REPLACE: summaryCard generation inside renderDrawerContent
+// ==========================================
     const summaryCard = `
         <div class="p-5 space-y-3">
             <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+                <div class="flex justify-between items-center mb-3 border-b border-indigo-100/50 pb-2">
+                    <span class="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
+                        <i data-lucide="info" class="w-4 h-4"></i> Core Order Details
+                    </span>
+                    <button onclick="openEditOrderModal('${order.id}')" class="bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit Details
+                    </button>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Order Value</div>
-                        <div class="text-lg font-extrabold text-gray-900 font-mono mt-0.5">₹${formatINR(order.order_value)}</div>
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Contact Person</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5">${escapeHtml(order.contact_person_name || 'N/A')}</div>
                     </div>
                     <div>
-                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Order Date</div>
-                        <div class="text-sm font-bold text-gray-900 mt-1">${order.order_date ? new Date(order.order_date).toLocaleDateString() : '—'}</div>
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Secondary Phone</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5 font-mono">${escapeHtml(order.customer_phone_2 || 'N/A')}</div>
                     </div>
                     <div>
-                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Order Referred By</div>
-                        <div class="text-sm font-bold text-gray-900 mt-1">${order.sales_person_name || '—'}</div>
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Destination Location</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5">${escapeHtml(order.city || '')}${order.state ? ', ' + escapeHtml(order.state) : ''}</div>
                     </div>
                     <div>
-                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider flex items-center justify-between">
-                            <span>Dispatch Mode</span>
-                            <button onclick="editDispatchMode('${order.id}', '${order.dispatch_mode || ''}')" class="text-indigo-600 hover:text-indigo-800 normal-case font-bold text-[10px]">
-                                <i data-lucide="edit-2" class="w-3 h-3 inline"></i> Edit
-                            </button>
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Payment Configuration</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5 flex items-center gap-1">
+                            <span class="uppercase">${order.payment_type || ''}</span>
+                            ${order.bank_name ? `<span class="bg-indigo-100 text-indigo-700 text-[10px] px-1 rounded font-mono">${order.bank_name}</span>` : ''}
                         </div>
-                        <div class="text-sm font-bold text-gray-900 mt-1" id="dispatch-mode-display">${order.dispatch_mode || '—'}</div>
+                    </div>
+                    <div class="border-t border-indigo-100/50 pt-2 mt-1">
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Order Referred By</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5">${escapeHtml(order.sales_person_name || 'N/A')}</div>
+                    </div>
+                    <div class="border-t border-indigo-100/50 pt-2 mt-1">
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Dispatch Mode</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5" id="dispatch-mode-display">${order.dispatch_mode || ' '}</div>
+                    </div>
+                    <div class="border-t border-indigo-100/50 pt-2 mt-1">
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Payment Term</div>
+                        <div class="mt-1">${paymentTermBadge(order.payment_term)}</div>
+                    </div>
+                    <div class="border-t border-indigo-100/50 pt-2 mt-1">
+                        <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Order Booked On</div>
+                        <div class="text-sm font-bold text-gray-900 mt-0.5 font-mono">${order.created_at ? new Date(order.created_at).toLocaleDateString() : ' '}</div>
                     </div>
                 </div>
             </div>
@@ -4539,3 +4564,231 @@ document.addEventListener('keydown', (e) => {
     }
 }, true);
 
+// ==========================================
+// NEW FEATURE: FULL MASTER ORDER HEADER EDITOR
+// ==========================================
+window.openEditOrderModal = async function(orderId) {
+    try {
+        const { order } = await window.db.getOrderDetail(orderId);
+        if (!order) return showToast('Order record not found', 'error');
+
+        let container = document.getElementById('edit-order-modal-container');
+        if (!container) {
+            document.body.insertAdjacentHTML('beforeend', '<div id="edit-order-modal-container"></div>');
+            container = document.getElementById('edit-order-modal-container');
+        }
+
+        const cityOptions = ['Delhi','Gurgaon','Noida','Ghaziabad','Faridabad','Mumbai','Bangalore','Chennai','Kolkata','Hyderabad','Pune','Ahmedabad','Jaipur','Lucknow','Chandigarh'];
+        const stateOptions = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Chandigarh','Puducherry'];
+        const salesOptions = ["Meena Bansal", "Anshu Bansal", "Shubhash Bansal", "IndiaMart", "Manisha"];
+
+        const isCityCustom = order.city && !cityOptions.includes(order.city);
+        const isStateCustom = order.state && !stateOptions.includes(order.state);
+        const isSalesCustom = order.sales_person_name && !salesOptions.includes(order.sales_person_name);
+
+        container.innerHTML = `
+            <div id="edit-order-modal" class="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop p-4">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden border border-gray-100 flex flex-col animate-in">
+                    <div class="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center flex-shrink-0">
+                        <div>
+                            <h3 class="font-extrabold text-lg text-gray-900 tracking-tight">Edit Order Specifications</h3>
+                            <p class="text-xs text-gray-500 font-mono mt-0.5">Modifying System ID: ${order.order_code}</p>
+                        </div>
+                        <button onclick="closeEditOrderModal()" class="text-gray-400 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-full p-1.5 transition">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="submitEditOrderForm(event, '${orderId}')" class="p-6 overflow-y-auto flex-1 space-y-4">
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Company Name *</label>
+                            <input type="text" id="eo_company_name" required value="${escapeHtml(order.customer_name || '')}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Contact Person</label>
+                                <input type="text" id="eo_contact_person" value="${escapeHtml(order.contact_person_name || '')}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Payment Term *</label>
+                                <select id="eo_payment_term" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="ADVANCE" ${order.payment_term === 'ADVANCE' ? 'selected' : ''}>ADVANCE (Paid)</option>
+                                    <option value="CREDIT" ${order.payment_term === 'CREDIT' ? 'selected' : ''}>CREDIT (Unpaid)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Customer Phone 1</label>
+                                <input type="tel" id="eo_phone" value="${escapeHtml(order.customer_phone || '')}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Customer Phone 2</label>
+                                <input type="tel" id="eo_phone_2" value="${escapeHtml(order.customer_phone_2 || '')}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">City</label>
+                                <select id="eo_city" onchange="handleEditCityChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="" ${!order.city ? 'selected' : ''}>Select city...</option>
+                                    ${cityOptions.map(c => `<option value="${c}" ${order.city === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    <option value="__OTHER__" ${isCityCustom ? 'selected' : ''}>+ Other (type city)</option>
+                                </select>
+                                <input type="text" id="eo_city_custom" value="${isCityCustom ? escapeHtml(order.city) : ''}" placeholder="Enter city..." style="display:${isCityCustom ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">State</label>
+                                <select id="eo_state" onchange="handleEditStateChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="" ${!order.state ? 'selected' : ''}>Select state...</option>
+                                    ${stateOptions.map(s => `<option value="${s}" ${order.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+                                    <option value="__OTHER__" ${isStateCustom ? 'selected' : ''}>+ Other (type state)</option>
+                                </select>
+                                <input type="text" id="eo_state_custom" value="${isStateCustom ? escapeHtml(order.state) : ''}" placeholder="Enter state..." style="display:${isStateCustom ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Payment Type *</label>
+                                <select id="eo_payment_type" required onchange="handleEditPaymentTypeChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="CASH" ${order.payment_type === 'CASH' ? 'selected' : ''}>CASH</option>
+                                    <option value="UPI" ${order.payment_type === 'UPI' ? 'selected' : ''}>UPI</option>
+                                    <option value="BANK" ${order.payment_type === 'BANK' ? 'selected' : ''}>BANK</option>
+                                </select>
+                                <select id="eo_bank_name" style="display:${order.payment_type === 'BANK' ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="" ${!order.bank_name ? 'selected' : ''} disabled>Select bank...</option>
+                                    <option value="KOTAK" ${order.bank_name === 'KOTAK' ? 'selected' : ''}>KOTAK</option>
+                                    <option value="PNB" ${order.bank_name === 'PNB' ? 'selected' : ''}>PNB</option>
+                                    <option value="HDFC" ${order.bank_name === 'HDFC' ? 'selected' : ''}>HDFC</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Dispatch Mode *</label>
+                                <select id="eo_dispatch_mode" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="PORTER" ${order.dispatch_mode === 'PORTER' ? 'selected' : ''}>PORTER</option>
+                                    <option value="TEMPO" ${order.dispatch_mode === 'TEMPO' ? 'selected' : ''}>TEMPO</option>
+                                    <option value="RICKSHAW" ${order.dispatch_mode === 'RICKSHAW' ? 'selected' : ''}>RICKSHAW</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Order Referred By *</label>
+                            <select id="eo_sales" required onchange="handleEditSalesChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="" disabled>Select source...</option>
+                                ${salesOptions.map(s => `<option value="${s}" ${order.sales_person_name === s ? 'selected' : ''}>${s}</option>`).join('')}
+                                <option value="__OTHER__" ${isSalesCustom ? 'selected' : ''}>+ Others (type name)</option>
+                            </select>
+                            <input type="text" id="eo_sales_custom" value="${isSalesCustom ? escapeHtml(order.sales_person_name) : ''}" placeholder="Enter referrer name..." style="display:${isSalesCustom ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+
+                        <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-gray-100">
+                            <button type="button" onclick="closeEditOrderModal()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                            <button type="submit" id="edit_order_submit_btn" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md flex items-center gap-2">
+                                <i data-lucide="save" class="w-4 h-4"></i> Save Alterations
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>`;
+        lucide.createIcons();
+    } catch (err) {
+        console.error(err);
+        showToast('Failed to pop editing panel', 'error');
+    }
+};
+
+window.closeEditOrderModal = function() {
+    document.getElementById('edit-order-modal')?.remove();
+};
+
+window.handleEditCityChange = function(el) {
+    document.getElementById('eo_city_custom').style.display = el.value === '__OTHER__' ? 'block' : 'none';
+};
+
+window.handleEditStateChange = function(el) {
+    document.getElementById('eo_state_custom').style.display = el.value === '__OTHER__' ? 'block' : 'none';
+};
+
+window.handleEditPaymentTypeChange = function(el) {
+    const bSelect = document.getElementById('eo_bank_name');
+    if (el.value === 'BANK') {
+        bSelect.style.display = 'block';
+        bSelect.required = true;
+    } else {
+        bSelect.style.display = 'none';
+        bSelect.required = false;
+        bSelect.value = '';
+    }
+};
+
+window.handleEditSalesChange = function(el) {
+    const cInput = document.getElementById('eo_sales_custom');
+    if (el.value === '__OTHER__') {
+        cInput.style.display = 'block';
+        cInput.required = true;
+    } else {
+        cInput.style.display = 'none';
+        cInput.required = false;
+        cInput.value = '';
+    }
+};
+
+window.submitEditOrderForm = async function(e, orderId) {
+    e.preventDefault();
+    const btn = document.getElementById('edit_order_submit_btn');
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline"></i> saving entries...`;
+    lucide.createIcons();
+
+    try {
+        const cityEl = document.getElementById('eo_city');
+        const cityValue = cityEl.value === '__OTHER__' ? document.getElementById('eo_city_custom').value.trim() : cityEl.value;
+
+        const stateEl = document.getElementById('eo_state');
+        const stateValue = stateEl.value === '__OTHER__' ? document.getElementById('eo_state_custom').value.trim() : stateEl.value;
+
+        const salesEl = document.getElementById('eo_sales');
+        const salesValue = salesEl.value === '__OTHER__' ? document.getElementById('eo_sales_custom').value.trim() : salesEl.value;
+
+        const paymentType = document.getElementById('eo_payment_type').value;
+        const bankName = paymentType === 'BANK' ? document.getElementById('eo_bank_name').value : null;
+
+        const updateData = {
+            customer_name: document.getElementById('eo_company_name').value.trim(),
+            contact_person_name: document.getElementById('eo_contact_person').value.trim() || null,
+            payment_term: document.getElementById('eo_payment_term').value,
+            customer_phone: document.getElementById('eo_phone').value.trim() || null,
+            customer_phone_2: document.getElementById('eo_phone_2').value.trim() || null,
+            city: cityValue || null,
+            state: stateValue || null,
+            payment_type: paymentType,
+            bank_name: bankName,
+            dispatch_mode: document.getElementById('eo_dispatch_mode').value,
+            sales_person_name: salesValue
+        };
+
+        const { error } = await window.db.supabase
+            .from('orders')
+            .update(updateData)
+            .eq('id', orderId);
+
+        if (error) throw error;
+
+        showToast('Order variables synchronized successfully!', 'success');
+        closeEditOrderModal();
+        openOrderDrawer(orderId); // Refresh layout variables inside the open drawer dynamically
+        
+        if (['#/orders', '#/dashboard', '#/board'].includes(location.hash)) router();
+    } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Error writing updates to storage engine', 'error');
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save Alterations`;
+        lucide.createIcons();
+    }
+};
