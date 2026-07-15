@@ -1548,47 +1548,13 @@ window.openStepModal = function(orderId, stepCode) {
         </select>
     ` : '';
 
-    // Same structured checklist as the mobile Packing Queue's accept flow —
-    // so completing this step gives the same result whether it's done via
-    // the normal drawer's "Upload Evidence" button or via Packing Queue.
-    const packingFields = stepCode === 'STEP5_PACKING_DONE' ? `
-        <div class="grid grid-cols-2 gap-2.5 mb-3">
-            <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Weight (kg)</label>
-                <input type="number" step="0.01" id="form-weight" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Nag Kitne Hai (No. of Cartons)</label>
-                <input type="number" id="form-cartons" required class="w-full border rounded-lg p-2 text-sm bg-gray-50">
-            </div>
-        </div>
-        <div class="flex flex-wrap gap-3 mb-3">
-            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-quality"> Quantity check</label>
-            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-label"> Labelling correct</label>
-            <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="form-marka"> Private marka</label>
-        </div>
-        <div class="grid grid-cols-2 gap-2.5 mb-3">
-            <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Maal Pack Hone Se Pehle Ki Photo</label>
-                <input type="file" id="form-photo-before" accept="image/*" required class="w-full text-xs">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Maal Pack Hone Ke Baad Ki Photo</label>
-                <input type="file" id="form-photo-after" accept="image/*" required class="w-full text-xs">
-            </div>
-        </div>
-    ` : '';
-
     const fields = `
         <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 text-xs text-indigo-900 leading-relaxed">
             💡 ${stepHint(stepCode)}
         </div>
         ${paymentFields}
-        ${packingFields}
-        ${stepCode !== 'STEP5_PACKING_DONE' ? `
         <label class="block text-sm font-semibold text-gray-700 mb-1">Proof File *</label>
         <input type="file" id="form-file" accept="image/*,.pdf" required class="w-full border rounded-lg p-2 text-sm bg-gray-50 mb-3">
-        ` : ''}
         <label class="block text-sm font-semibold text-gray-700 mb-1">Notes (optional)</label>
         <textarea id="form-notes" placeholder="Any notes for this step..." class="w-full border rounded-lg p-2 text-sm h-20"></textarea>`;
 
@@ -1644,18 +1610,6 @@ window.submitStepForm = async function(e, orderId, stepCode, bucket) {
             if (paymentTypeEl.value === 'BANK') {
                 formData.bank_name_confirmed = document.getElementById('form-bank-name')?.value || null;
             }
-        }
-
-        if (stepCode === 'STEP5_PACKING_DONE') {
-            formData.weight_kg = parseFloat(document.getElementById('form-weight').value);
-            formData.num_cartons = parseInt(document.getElementById('form-cartons').value, 10);
-            formData.quality_check = document.getElementById('form-quality').checked;
-            formData.labelling_check = document.getElementById('form-label').checked;
-            formData.private_marka_check = document.getElementById('form-marka').checked;
-            const beforeFile = document.getElementById('form-photo-before').files[0];
-            const afterFile = document.getElementById('form-photo-after').files[0];
-            if (beforeFile) formData.photo_before_url = await window.db.uploadFile(bucket, beforeFile);
-            if (afterFile) formData.photo_after_url = await window.db.uploadFile(bucket, afterFile);
         }
 
         const fileInput = document.getElementById('form-file');
@@ -4452,31 +4406,13 @@ function renderPackingChecklistCard(o) {
                 </div>
                 <span class="text-[10px] font-bold px-2 py-1 rounded bg-orange-100 text-orange-700">${o.assigned_packer}</span>
             </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-xs text-amber-800">
+                📋 Fill out the packing checklist in the Google Form, then confirm completion here.
+            </div>
             <form onsubmit="submitPackingChecklist(event, '${o.id}')" class="space-y-2.5">
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="text-[11px] font-bold text-gray-500">Weight (kg)</label>
-                        <input type="number" step="0.01" id="pk-weight-${o.id}" required class="w-full border rounded-lg p-2 text-sm mt-0.5">
-                    </div>
-                    <div>
-                        <label class="text-[11px] font-bold text-gray-500">Nag Kitne Hai (No. of Cartons)</label>
-                        <input type="number" id="pk-cartons-${o.id}" required class="w-full border rounded-lg p-2 text-sm mt-0.5">
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-3 pt-1">
-                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-quality-${o.id}"> Quantity check</label>
-                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-label-${o.id}"> Labelling correct</label>
-                    <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-700"><input type="checkbox" id="pk-marka-${o.id}"> Private marka</label>
-                </div>
-                <div class="grid grid-cols-2 gap-2.5 pt-1">
-                    <div>
-                        <label class="text-[11px] font-bold text-gray-500">Maal Pack Hone Se Pehle Ki Photo</label>
-                        <input type="file" id="pk-photo-before-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
-                    </div>
-                    <div>
-                        <label class="text-[11px] font-bold text-gray-500">Maal Pack Hone Ke Baad Ki Photo</label>
-                        <input type="file" id="pk-photo-after-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
-                    </div>
+                <div>
+                    <label class="text-[11px] font-bold text-gray-500">Proof Photo</label>
+                    <input type="file" id="pk-photo-${o.id}" accept="image/*" required class="w-full text-xs mt-0.5">
                 </div>
                 <textarea id="pk-notes-${o.id}" placeholder="Notes (optional)" class="w-full border rounded-lg p-2 text-sm h-16 mt-1"></textarea>
                 <button type="submit" id="pk-submit-${o.id}" class="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold">Complete Packing</button>
@@ -4511,20 +4447,13 @@ window.submitPackingChecklist = async function(e, orderId) {
     try {
         const formData = {
             submitted_at: new Date().toISOString(),
-            submitted_by: currentUser.id,
-            weight_kg: parseFloat(document.getElementById(`pk-weight-${orderId}`).value),
-            num_cartons: parseInt(document.getElementById(`pk-cartons-${orderId}`).value, 10),
-            quality_check: document.getElementById(`pk-quality-${orderId}`).checked,
-            labelling_check: document.getElementById(`pk-label-${orderId}`).checked,
-            private_marka_check: document.getElementById(`pk-marka-${orderId}`).checked
+            submitted_by: currentUser.id
         };
         const notes = document.getElementById(`pk-notes-${orderId}`).value;
         if (notes) formData.notes = notes;
 
-        const beforeFile = document.getElementById(`pk-photo-before-${orderId}`).files[0];
-        const afterFile = document.getElementById(`pk-photo-after-${orderId}`).files[0];
-        if (beforeFile) formData.photo_before_url = await window.db.uploadFile('bmh-proofs', beforeFile);
-        if (afterFile) formData.photo_after_url = await window.db.uploadFile('bmh-proofs', afterFile);
+        const photoFile = document.getElementById(`pk-photo-${orderId}`).files[0];
+        if (photoFile) formData.file_url = await window.db.uploadFile('bmh-proofs', photoFile);
 
         await window.db.submitStep(orderId, 'STEP5_PACKING_DONE', formData);
         showToast('Packing completed!', 'success');
