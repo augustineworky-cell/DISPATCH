@@ -13,6 +13,18 @@ let currentOrgId = null;
 let stepsDirectory = [];
 let stepLabels = {};
 
+// ==========================================
+// NEW WORKSPACE ASSET: MASTER COMPREHENSIVE INDIAN CITIES REGISTRY
+// ==========================================
+const INDIAN_CITIES_REGISTRY = [
+    'Delhi', 'Gurgaon', 'Noida', 'Ghaziabad', 'Faridabad', 
+    'Mumbai', 'Bangalore', 'Bengaluru', 'Hyderabad', 'Ahmedabad', 'Chennai', 'Kolkata', 'Pune',
+    'Chandigarh', 'Jaipur', 'Lucknow', 'Kanpur', 'Ludhiana', 'Amritsar', 'Varanasi', 'Agra', 'Jammu',
+    'Surat', 'Vadodara', 'Nagpur', 'Nashik', 'Rajkot', 'Indore', 'Bhopal', 'Gwalior',
+    'Visakhapatnam', 'Vijayawada', 'Kochi', 'Coimbatore', 'Madurai', 'Mysore', 'Thiruvananthapuram', 'Kozhikode',
+    'Patna', 'Bhubaneswar', 'Ranchi', 'Raipur', 'Guwahati', 'Jamshedpur', 'Cuttack'
+];
+
 const STEP_VISUAL_PALETTE = [
     { color: '#3b82f6', icon: 'file-text' },      // STEP2_PI_CREATED
     { color: '#8b5cf6', icon: 'check-circle' },   // STEP3_PAYMENT_CONFIRMED
@@ -935,15 +947,13 @@ async function renderNewOrder(container) {
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Customer Phone 2</label>
                             <input type="tel" id="no_phone_2" placeholder="9876543210" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
-                        <div class="col-span-2 md:col-span-1">
+           <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">City</label>
-                            <select id="no_city" onchange="handleCityChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <option value="" disabled selected>Select city...</option>
-                                ${['Delhi','Gurgaon','Noida','Ghaziabad','Faridabad','Mumbai','Bangalore','Chennai','Kolkata','Hyderabad','Pune','Ahmedabad','Jaipur','Lucknow','Chandigarh']
-                                    .map(c => `<option value="${c}">${c}</option>`).join('')}
-                                <option value="__OTHER__">+ Other (type city)</option>
-                            </select>
-                            <input type="text" id="no_city_custom" placeholder="Enter city name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <input type="text" id="no_city" list="indian-cities-datalist" placeholder="Type city name to search..." autocomplete="off"
+                                   class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            <datalist id="indian-cities-datalist">
+                                ${INDIAN_CITIES_REGISTRY.map(c => `<option value="${c}"></option>`).join('')}
+                            </datalist>
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">State</label>
@@ -1740,10 +1750,8 @@ window.handleCreateOrder = async function(e) {
         const paymentTypeInput = document.getElementById('no_payment_type').value;
         const bankNameInput = paymentTypeInput === 'BANK' ? (document.getElementById('no_bank_name').value || null) : null;
 
-        const cityEl = document.getElementById('no_city');
-        const cityInput = cityEl.value === '__OTHER__'
-            ? document.getElementById('no_city_custom').value.trim()
-            : cityEl.value;
+       const cityEl = document.getElementById('no_city');
+        const cityInput = cityEl ? cityEl.value.trim() : null;
 
         const stateEl = document.getElementById('no_state');
         const stateInput = stateEl.value === '__OTHER__'
