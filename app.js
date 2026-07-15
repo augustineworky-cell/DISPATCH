@@ -1004,6 +1004,7 @@ async function renderNewOrder(container) {
                                 <option value="PORTER">PORTER</option>
                                 <option value="TEMPO">TEMPO</option>
                                 <option value="RICKSHAW">RICKSHAW</option>
+                                <option value="SELF">SELF (Customer Pickup)</option>
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
@@ -3711,7 +3712,8 @@ async function renderRickshawDispatch(container) {
 
     // Filter into real-time operational streams based on user booking type
     const rickshawOrders = (orders || []).filter(o => o.dispatch_mode === 'RICKSHAW');
-    const otherOrders = (orders || []).filter(o => o.dispatch_mode !== 'RICKSHAW');
+    const selfOrders = (orders || []).filter(o => o.dispatch_mode === 'SELF');
+    const otherOrders = (orders || []).filter(o => o.dispatch_mode !== 'RICKSHAW' && o.dispatch_mode !== 'SELF');
 
     // ─── STREAM A: PURE RICKSHAW GRAPH ───
     const unassigned = rickshawOrders.filter(o => !o.rickshaw_wala);
@@ -3826,13 +3828,53 @@ async function renderRickshawDispatch(container) {
                 </div>
             </div>
 
-            <div class="space-y-3">
+ <div class="space-y-3">
                 <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">🚚 External Vehicle Booking Logs (Porter / Tempo / Cargo)</h3>
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full">
                     <div class="overflow-x-auto w-full">
                         <div class="w-full min-w-[1150px]">
                             ${otherHeaderRow}
                             ${otherSections}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">🚶 Self-Pickup Orders (Customer Collection Logs)</h3>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full">
+                    <div class="overflow-x-auto w-full">
+                        <div class="w-full min-w-[1150px]">
+                            <div class="flex items-center gap-1 px-3 py-2.5 bg-gray-100 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                <div class="w-20 flex-shrink-0">Order</div>
+                                <div class="w-32 flex-shrink-0">Customer</div>
+                                <div class="w-28 flex-shrink-0">Current Step</div>
+                                <div class="w-24 flex-shrink-0">Mode</div>
+                                <div class="w-40 flex-shrink-0">Receiver Name / Mobile No</div>
+                                <div class="flex-1 min-w-[200px]">Upload Handoff Signed Challan</div>
+                                <div class="w-32 flex-shrink-0 text-center sticky right-0 z-10 bg-gray-100 border-l border-gray-200 pl-2 shadow-sm">Actions</div>
+                            </div>
+                            ${selfOrders.length ? selfOrders.map(o => `
+                            <div class="flex items-center gap-1 px-3 py-2.5 border-b border-gray-50 bg-white" data-order-row="${o.id}">
+                                <div class="w-20 flex-shrink-0"><p class="font-mono font-bold text-sm text-gray-900 truncate">${o.order_code}</p></div>
+                                <div class="w-32 flex-shrink-0 text-sm font-semibold text-gray-800 truncate" title="${escapeHtml(o.customer_name)}">${escapeHtml(o.customer_name)}</div>
+                                <div class="w-28 flex-shrink-0"><span class="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 truncate inline-block max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></div>
+                                <div class="w-24 flex-shrink-0"><span class="text-[10px] font-black px-2 py-0.5 rounded uppercase text-emerald-700 bg-emerald-100">SELF PICKUP</span></div>
+                                <div class="w-40 flex-shrink-0 pr-2">
+                                    <input id="ot-transport-${o.id}" type="text" value="${escapeHtml(o.transport_name && o.transport_name !== 'External Handoff Log' ? o.transport_name : '')}"
+                                        placeholder="e.g. Customer Self-Collected"
+                                        class="w-full border border-gray-300 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-indigo-500">
+                                </div>
+                                <div class="flex-1 min-w-[200px]">
+                                    <input type="file" id="ot-file-${o.id}" accept="image/*,.pdf"
+                                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                                </div>
+                                <div class="w-32 flex-shrink-0 flex items-center justify-center sticky right-0 z-10 border-l border-gray-200 pl-2 bg-white shadow-sm">
+                                    <button onclick="submitOtherTransportation('${o.id}')" id="ot-btn-${o.id}" class="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-all">
+                                        <i data-lucide="check-circle" class="w-3 h-3"></i> Confirm Handoff
+                                    </button>
+                                </div>
+                            </div>`).join('') : `<div class="p-8 text-center text-gray-400 text-sm font-medium bg-white">No pending self-pickup orders waiting for verification signatures.</div>`}
                         </div>
                     </div>
                 </div>
@@ -4930,6 +4972,7 @@ window.openEditOrderModal = async function(orderId) {
                                     <option value="PORTER" ${order.dispatch_mode === 'PORTER' ? 'selected' : ''}>PORTER</option>
                                     <option value="TEMPO" ${order.dispatch_mode === 'TEMPO' ? 'selected' : ''}>TEMPO</option>
                                     <option value="RICKSHAW" ${order.dispatch_mode === 'RICKSHAW' ? 'selected' : ''}>RICKSHAW</option>
+                                    <option value="SELF" ${order.dispatch_mode === 'SELF' ? 'selected' : ''}>SELF (Customer Pickup)</option>
                                 </select>
                             </div>
                         </div>
