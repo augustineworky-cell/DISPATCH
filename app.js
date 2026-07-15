@@ -743,7 +743,10 @@ async function renderDashboard(container) {
                         </h3>
                     </div>
                     <div class="divide-y divide-gray-100 flex-1 overflow-y-auto">
-                        ${(tasks && tasks.length > 0) ? tasks.map(t => `
+                        ${(tasks && tasks.length > 0) ? tasks.map(t => {
+                            const rawRole = stepLabels[t.step_code]?.ownerRole;
+                            const dynamicDoer = formatRoleName(rawRole) || 'System';
+                            return `
                             <div class="flex items-center justify-between p-4 hover:bg-gray-50 transition group">
                                 <div class="flex items-start gap-4 cursor-pointer flex-1 min-w-0" onclick="openOrderDrawer('${t.order_id}')">
                                     <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${t.is_delayed ? 'bg-red-500 text-white' : 'bg-indigo-500 text-white'}">
@@ -755,7 +758,12 @@ async function renderDashboard(container) {
                                             <span class="font-extrabold text-sm text-gray-900 truncate">${t.customer_name}</span>
                                             ${t.is_delayed ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold rounded uppercase"><i data-lucide="clock" class="w-2.5 h-2.5"></i> ${formatDelay(t.delay_minutes)} Overdue</span>` : `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold rounded uppercase">Upcoming</span>`}
                                         </div>
-                                        <p class="text-xs text-gray-700 font-semibold truncate"><span class="text-gray-400 font-medium">Pending Action:</span> ${stepName(t.step_code)}</p>
+                                        <div class="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1">
+                                            <p class="text-xs text-gray-700 font-semibold truncate"><span class="text-gray-400 font-medium">Pending Action:</span> ${stepName(t.step_code)}</p>
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-extrabold rounded-md uppercase tracking-wider shadow-sm">
+                                                <i data-lucide="user" class="w-3 h-3"></i> Pending With: ${dynamicDoer}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="pl-4 flex-shrink-0">
@@ -763,7 +771,8 @@ async function renderDashboard(container) {
                                         Perform Task <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
                                     </button>
                                 </div>
-                            </div>`).join('') : `
+                            </div>`;
+                        }).join('') : `
                             <div class="p-8 text-center text-gray-400 flex flex-col items-center">
                                 <i data-lucide="check-circle-2" class="w-12 h-12 text-emerald-400 mb-3"></i>
                                 <p class="font-semibold">No pending actions. Inbox zero!</p>
@@ -906,6 +915,7 @@ async function renderOrders(container) {
                     <thead class="bg-white text-gray-500 sticky top-0 z-10 border-b border-gray-200 shadow-sm">
                         <tr>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">${t('order_code')}</th>
+                            <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Date</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">${t('customer')}</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Value</th>
                             <th class="px-6 py-3 uppercase tracking-wider text-[11px] font-bold">Dispatch Mode</th>
@@ -1019,12 +1029,12 @@ async function renderNewOrder(container) {
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-2 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Bansal PI Tally 1 (optional)</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Proforma Invoice (PI) (optional)</label>
                                 <input type="file" id="no_pi_file" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
                                 <p class="text-[11px] text-gray-400 mt-1">Files attached here link cleanly to Step 1 (Order Received) evidence logs.</p>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Fensterdecors Tally 2 PI (optional)</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Commercial Invoice (Invoice) (optional)</label>
                                 <input type="file" id="no_pi_file_2" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
                                 <p class="text-[11px] text-gray-400 mt-1">Files attached here load instantly as active evidence under Step 2.</p>
                             </div>
@@ -1415,7 +1425,7 @@ function renderDrawerStep(step, order, latestSub, isLocked = false, lockedOnStep
             if (key.endsWith('_url') && fd[key] && typeof fd[key] === 'string') {
                // Human-friendly label from the key
                 const labelMap = {
-                    'file_url':     { label: code === 'STEP1_ORDER_RECEIVED' ? 'Bansal PI Tally 1' : (code === 'STEP2_PI_CREATED' ? 'Fensterdecors Tally 2 PI' : 'Evidence'), icon: 'file-text', color: code === 'STEP2_PI_CREATED' ? 'purple' : 'indigo' },
+                    'file_url':     { label: code === 'STEP1_ORDER_RECEIVED' ? 'Proforma Invoice (PI)' : (code === 'STEP2_PI_CREATED' ? 'Commercial Invoice (Invoice)' : 'Evidence'), icon: 'file-text', color: code === 'STEP2_PI_CREATED' ? 'purple' : 'indigo' },
                     'video_url':    { label: 'Video',        icon: 'video',     color: 'purple' },
                     'gatepass_url': { label: 'Gate Pass',    icon: 'ticket',    color: 'amber'  },
                     'photo_url':    { label: 'Photo',        icon: 'image',     color: 'pink'   },
@@ -3023,14 +3033,17 @@ function renderOrderRows(orders) {
     const tbody = document.getElementById('orders-tbody');
     if (!tbody) return;
     if (orders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-400 text-sm">No orders match your filters</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-gray-400 text-sm">No orders match your filters</td></tr>`;
         return;
     }
-    tbody.innerHTML = orders.map((o, i) => `
+    tbody.innerHTML = orders.map((o, i) => {
+        const formattedDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+        return `
         <tr class="order-row-enter hover:bg-indigo-50/50 cursor-pointer"
             style="animation-delay:${Math.min(i * 22, 300)}ms"
             onclick="openOrderDrawer('${o.id}')">
             <td class="px-6 py-3.5 font-mono text-indigo-600 font-bold">${o.order_code}</td>
+            <td class="px-6 py-3.5 text-gray-600 font-semibold whitespace-nowrap">${formattedDate}</td>
             <td class="px-6 py-3.5 font-semibold text-gray-900">${escapeHtml(o.customer_name)}</td>
             <td class="px-6 py-3.5 font-medium text-gray-700 font-mono">₹${formatINR(o.order_value)}</td>
             <td class="px-6 py-3.5"><span class="text-[10px] font-bold px-2 py-1 rounded uppercase ${o.dispatch_mode === 'PORTER' ? 'bg-blue-100 text-blue-700' : o.dispatch_mode === 'SELF' ? 'bg-green-100 text-green-700' : o.dispatch_mode === 'DTDC' || o.dispatch_mode === 'TRACKON' ? 'bg-purple-100 text-purple-700' : o.dispatch_mode === 'CARGO' || o.dispatch_mode === 'BUS' ? 'bg-orange-100 text-orange-700' : o.dispatch_mode === 'DELIVERY' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}">${o.dispatch_mode || '—'}</span></td>
@@ -3043,7 +3056,8 @@ function renderOrderRows(orders) {
                   : o.is_delayed ? `<span class="px-2.5 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">Delayed</span>`
                   : `<span class="px-2.5 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">Active</span>`}
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 // ==========================================
@@ -4226,6 +4240,7 @@ async function renderPaymentStatus(container) {
                 <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
                     <tr>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">${t('order_code')}</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Date</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Customer</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">City</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">State</th>
@@ -4246,7 +4261,10 @@ async function renderPaymentStatus(container) {
                         if (o.payment_type === 'CASH') badgeStyle = 'text-emerald-700 bg-emerald-100';
                         if (o.payment_type === 'BANK') badgeStyle = 'text-blue-700 bg-blue-100';
 
-                        // Dynamic billing label mapping for clean execution tracking
+                        // Human-readable date token
+                        const formattedDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+
+                        // Dynamic balance tracker mapping
                         const balanceDisplay = o.payment_term === 'ADVANCE' 
                             ? `<span class="text-gray-900 font-mono font-bold">₹${formatINR(o.order_value)}</span><span class="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded ml-2">RECEIVED</span>`
                             : `<span class="text-red-600 font-mono font-extrabold">₹${formatINR(o.order_value)}</span><span class="text-[9px] font-extrabold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded ml-2 animate-pulse">PENDING CALL</span>`;
@@ -4254,6 +4272,7 @@ async function renderPaymentStatus(container) {
                         return `
                         <tr class="hover:bg-indigo-50/50 cursor-pointer" onclick="openOrderDrawer('${o.id}')">
                             <td class="px-3 py-3 font-mono text-indigo-600 font-bold whitespace-nowrap">${o.order_code}</td>
+                            <td class="px-3 py-3 text-gray-600 font-semibold whitespace-nowrap">${formattedDate}</td>
                             <td class="px-3 py-3 font-semibold text-gray-900">${escapeHtml(o.customer_name)}</td>
                             <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.city) || '—'}</td>
                             <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.state) || '—'}</td>
@@ -4927,12 +4946,12 @@ window.openEditOrderModal = async function(orderId) {
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 col-span-2">
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Bansal PI Tally 1</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Proforma Invoice (PI)</label>
                                 <input type="file" id="eo_pi_file" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
                                 <p class="text-[10px] text-gray-400 mt-1">Overwrites or updates your default Step 1 record.</p>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Fensterdecors Tally 2 PI</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Commercial Invoice (Invoice)</label>
                                 <input type="file" id="eo_pi_file_2" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
                                 <p class="text-[10px] text-gray-400 mt-1">Overwrites or updates your default Step 2 ledger entry.</p>
                             </div>
