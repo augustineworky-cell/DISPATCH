@@ -3534,38 +3534,43 @@ async function renderPackingAssignment(container) {
                 <div class="overflow-x-auto">
                 <div class="min-w-[640px]">
                 <div class="grid grid-cols-12 gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    <div class="col-span-3">Order</div>
+                    <div class="col-span-2">Order</div>
                     <div class="col-span-3">Customer</div>
                     <div class="col-span-2">Step</div>
                     <div class="col-span-2">Packer</div>
-                    <div class="col-span-2">Priority</div>
+                    <div class="col-span-2">Rechecker</div>
+                    <div class="col-span-1">Priority</div>
                 </div>
                 ${orders.length === 0 ? `<div class="p-10 text-center text-gray-400 text-sm">No orders currently approaching the packing stage.</div>` : orders.map(o => `
                     <div class="grid grid-cols-12 gap-2 px-5 py-3 border-b border-gray-50 items-center" data-order-row="${o.id}">
-                        <div class="col-span-3">
+                        <div class="col-span-2">
                             <p class="font-bold text-sm text-gray-900">${o.order_code}</p>
                             <p class="text-[11px] text-gray-400">${stepName(o.current_step)}</p>
                         </div>
-                        <div class="col-span-3 text-sm text-gray-700">${escapeHtml(o.customer_name)}</div>
+                        <div class="col-span-3 text-sm text-gray-700 truncate" title="${escapeHtml(o.customer_name)}">${escapeHtml(o.customer_name)}</div>
                         <div class="col-span-2">
                             <span class="text-[11px] font-bold px-2 py-1 rounded ${o.current_step === 'STEP5_PACKING_DONE' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}">
                                 ${o.current_step === 'STEP5_PACKING_DONE' ? 'Ready to pack' : 'Sent to packing'}
                             </span>
                         </div>
                         <div class="col-span-2">
-                            <select onchange="handlePackerAssign('${o.id}', this.value, document.getElementById('priority-${o.id}').value)" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                            <select id="packer-${o.id}" onchange="handlePackerAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
                                 <option value="" ${!o.assigned_packer ? 'selected' : ''}>Unassigned</option>
                                 ${PACKER_NAMES.map(p => `<option value="${p}" ${o.assigned_packer === p ? 'selected' : ''}>${p}</option>`).join('')}
                             </select>
                         </div>
                         <div class="col-span-2">
-                            <select id="priority-${o.id}"
-                                onchange="handlePackerAssign('${o.id}', this.parentElement.parentElement.querySelector('select').value, this.value)"
-                                class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                            <select id="rechecker-${o.id}" onchange="handlePackerAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs">
+                                <option value="" ${!o.assigned_rechecker ? 'selected' : ''}>Unassigned</option>
+                                ${PACKER_NAMES.map(p => `<option value="${p}" ${o.assigned_rechecker === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-span-1">
+                            <select id="priority-${o.id}" onchange="handlePackerAssign('${o.id}')" class="w-full border border-gray-300 rounded-lg p-1.5 text-xs px-0.5">
                                 <option value="" ${!o.packing_priority ? 'selected' : ''}>— None —</option>
                                 <option value="1" ${o.packing_priority === 1 ? 'selected' : ''}>🔴 Urgent</option>
                                 <option value="2" ${o.packing_priority === 2 ? 'selected' : ''}>🟠 High</option>
-                                <option value="3" ${o.packing_priority === 3 ? 'selected' : ''}>🔵 Moderate</option>
+                                <option value="3" ${o.packing_priority === 3 ? 'selected' : ''}>🔵 Mod</option>
                                 <option value="4" ${o.packing_priority === 4 ? 'selected' : ''}>⚪ Low</option>
                             </select>
                         </div>
@@ -3577,10 +3582,24 @@ async function renderPackingAssignment(container) {
         </div>`;
 }
 
-window.handlePackerAssign = async function(orderId, packerName, priority) {
+window.handlePackerAssign = async function(orderId) {
+    const packer = document.getElementById(`packer-${orderId}`)?.value || null;
+    const rechecker = document.getElementById(`rechecker-${orderId}`)?.value || null;
+    const priorityRaw = document.getElementById(`priority-${orderId}`)?.value;
+    const priority = priorityRaw ? parseInt(priorityRaw, 10) : null;
+
     try {
-        await window.db.assignPacker(orderId, packerName || null, priority ? parseInt(priority, 10) : null);
-        showToast('Packing assignment updated', 'success');
+        const { error } = await window.db.supabase
+            .from('orders')
+            .update({ 
+                assigned_packer: packer,
+                assigned_rechecker: rechecker,
+                packing_priority: priority
+            })
+            .eq('id', orderId);
+
+        if (error) throw error;
+        showToast('Packing & Rechecking metrics updated!', 'success');
     } catch (err) {
         showToast(err.message, 'error');
     }
