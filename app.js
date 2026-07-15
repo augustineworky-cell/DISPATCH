@@ -1017,10 +1017,17 @@ async function renderNewOrder(container) {
                                 <option value="CREDIT">CREDIT</option>
                             </select>
                         </div>
-                        <div class="col-span-2">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Performa Invoice / Order Document (optional)</label>
-                            <input type="file" id="no_pi_file" accept="image/*,.pdf" class="w-full border border-gray-300 rounded-lg p-2 text-sm">
-                            <p class="text-[11px] text-gray-400 mt-1">If attached here, it will show as evidence on Step 1 (Order Received) in the drawer.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-2 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Bansal PI Tally 1 (optional)</label>
+                                <input type="file" id="no_pi_file" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
+                                <p class="text-[11px] text-gray-400 mt-1">Files attached here link cleanly to Step 1 (Order Received) evidence logs.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Fensterdecors Tally 2 PI (optional)</label>
+                                <input type="file" id="no_pi_file_2" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
+                                <p class="text-[11px] text-gray-400 mt-1">Files attached here load instantly as active evidence under Step 2.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
@@ -1406,9 +1413,9 @@ function renderDrawerStep(step, order, latestSub, isLocked = false, lockedOnStep
         // Detect ALL file URLs in form_data (any key ending with _url)
         Object.keys(fd).forEach(key => {
             if (key.endsWith('_url') && fd[key] && typeof fd[key] === 'string') {
-                // Human-friendly label from the key
+               // Human-friendly label from the key
                 const labelMap = {
-                    'file_url':     { label: 'Evidence',     icon: 'paperclip', color: 'indigo' },
+                    'file_url':     { label: code === 'STEP1_ORDER_RECEIVED' ? 'Bansal PI Tally 1' : (code === 'STEP2_PI_CREATED' ? 'Fensterdecors Tally 2 PI' : 'Evidence'), icon: 'file-text', color: code === 'STEP2_PI_CREATED' ? 'purple' : 'indigo' },
                     'video_url':    { label: 'Video',        icon: 'video',     color: 'purple' },
                     'gatepass_url': { label: 'Gate Pass',    icon: 'ticket',    color: 'amber'  },
                     'photo_url':    { label: 'Photo',        icon: 'image',     color: 'pink'   },
@@ -1785,6 +1792,17 @@ window.handleCreateOrder = async function(e) {
         if (piFile) {
             const piFileUrl = await window.db.uploadFile('bmh-proofs', piFile);
             await window.db.attachStep1Evidence(newOrder.id, piFileUrl, currentUser.id);
+        }
+
+        const piFile2 = document.getElementById('no_pi_file_2').files[0];
+        if (piFile2) {
+            const piFile2Url = await window.db.uploadFile('bmh-proofs', piFile2);
+            await window.db.submitStep(newOrder.id, 'STEP2_PI_CREATED', {
+                submitted_at: new Date().toISOString(),
+                submitted_by: currentUser.id,
+                file_url: piFile2Url,
+                notes: 'Auto-provisioned Fensterdecors asset via pipeline setup.'
+            });
         }
 
         showToast('Order created!', 'success');
@@ -4108,11 +4126,21 @@ async function renderPaymentStatus(container) {
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">State</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Referred By</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Current Step</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Expected Mode</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Payment Term</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    ${list.map(o => `
+                    ${list.map(o => {
+                        const typeVal = o.payment_type ? o.payment_type.toUpperCase() : '—';
+                        const bankString = (o.payment_type === 'BANK' && o.bank_name) ? `<span class="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-black ml-1.5 shadow-sm">${o.bank_name}</span>` : '';
+                        
+                        let badgeStyle = 'text-gray-600 bg-gray-100';
+                        if (o.payment_type === 'UPI') badgeStyle = 'text-purple-700 bg-purple-100';
+                        if (o.payment_type === 'CASH') badgeStyle = 'text-emerald-700 bg-emerald-100';
+                        if (o.payment_type === 'BANK') badgeStyle = 'text-blue-700 bg-blue-100';
+
+                        return `
                         <tr class="hover:bg-indigo-50/50 cursor-pointer" onclick="openOrderDrawer('${o.id}')">
                             <td class="px-3 py-3 font-mono text-indigo-600 font-bold whitespace-nowrap">${o.order_code}</td>
                             <td class="px-3 py-3 font-semibold text-gray-900">${escapeHtml(o.customer_name)}</td>
@@ -4120,8 +4148,10 @@ async function renderPaymentStatus(container) {
                             <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.state) || '—'}</td>
                             <td class="px-3 py-3 text-gray-700">${escapeHtml(o.sales_person_name) || '—'}</td>
                             <td class="px-3 py-3 max-w-[220px]"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded inline-block">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
+                            <td class="px-3 py-3 whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase ${badgeStyle}">${typeVal}</span>${bankString}</td>
                             <td class="px-3 py-3 whitespace-nowrap">${paymentTermBadge(o.payment_term)}</td>
-                        </tr>`).join('')}
+                        </tr>`;
+                    }).join('')}
                 </tbody>
             </table>
             </div>`}
@@ -4783,10 +4813,17 @@ window.openEditOrderModal = async function(orderId) {
                             <input type="text" id="eo_sales_custom" value="${isSalesCustom ? escapeHtml(order.sales_person_name) : ''}" placeholder="Enter referrer name..." style="display:${isSalesCustom ? 'block' : 'none'};" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
 
-                        <div class="pt-2">
-                            <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Sales Order / Order Document (optional)</label>
-                            <input type="file" id="eo_pi_file" accept="image/*,.pdf" class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50 outline-none">
-                            <p class="text-[11px] text-gray-400 mt-1">Attaching a file updates your primary sales record and synchronizes Step 1 data safely without moving milestone markers.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 col-span-2">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Bansal PI Tally 1</label>
+                                <input type="file" id="eo_pi_file" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
+                                <p class="text-[10px] text-gray-400 mt-1">Overwrites or updates your default Step 1 record.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Fensterdecors Tally 2 PI</label>
+                                <input type="file" id="eo_pi_file_2" accept="image/*,.pdf" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm outline-none">
+                                <p class="text-[10px] text-gray-400 mt-1">Overwrites or updates your default Step 2 ledger entry.</p>
+                            </div>
                         </div>
 
                         <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-gray-100">
@@ -4883,14 +4920,29 @@ window.submitEditOrderForm = async function(e, orderId) {
         if (fileInput && fileInput.files.length > 0) {
             const uploadedUrl = await window.db.uploadFile('bmh-proofs', fileInput.files[0]);
             
-            // Clean up old step 1 records to maintain single pristine reference state
             await window.db.supabase.from('step_submissions')
                 .update({ is_latest: false })
                 .eq('order_id', orderId)
                 .eq('step_code', 'STEP1_ORDER_RECEIVED');
 
-            // Register file evidence into step_submissions safely without modifying main table cache fields
             await window.db.attachStep1Evidence(orderId, uploadedUrl, currentUser.id);
+        }
+
+        const fileInput2 = document.getElementById('eo_pi_file_2');
+        if (fileInput2 && fileInput2.files.length > 0) {
+            const uploadedUrl2 = await window.db.uploadFile('bmh-proofs', fileInput2.files[0]);
+            
+            await window.db.supabase.from('step_submissions')
+                .update({ is_latest: false })
+                .eq('order_id', orderId)
+                .eq('step_code', 'STEP2_PI_CREATED');
+
+            await window.db.submitStep(orderId, 'STEP2_PI_CREATED', {
+                submitted_at: new Date().toISOString(),
+                submitted_by: currentUser.id,
+                file_url: uploadedUrl2,
+                notes: 'Synchronized via Master Specifications Panel.'
+            });
         }
 
         const { error } = await window.db.supabase
