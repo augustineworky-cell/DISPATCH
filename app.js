@@ -3792,9 +3792,9 @@ async function renderRickshawDispatch(container) {
         </div>`;
     }).join('') : `<div class="p-8 text-center text-gray-400 text-sm font-medium bg-white">No active Porter or Tempo shipments pending verification.</div>`;
 
-    // Master workspace rendering interface injection
+    // Master workspace rendering interface injection — EXPANDED FOR ULTRA-WIDE MONITOR INTERFACES
     container.innerHTML = `
-        <div class="max-w-5xl mx-auto space-y-8 animate-in">
+        <div class="w-full space-y-8 animate-in px-1">
             <div>
                 <h2 class="text-2xl font-extrabold text-gray-900 tracking-tight">Logistics & Dispatch Routing</h2>
                 <p class="text-sm text-gray-500 mt-1">Manage localized driver allocations and external freight carriers from a unified command board.</p>
@@ -3802,9 +3802,9 @@ async function renderRickshawDispatch(container) {
             
             <div class="space-y-3">
                 <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">🛺 Local Rickshaw Delivery Schedules</h3>
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <div class="min-w-[1150px]">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full">
+                    <div class="overflow-x-auto w-full">
+                        <div class="w-full min-w-[1150px]">
                             ${headerRow}
                             ${rickshawOrders.length === 0 ? `<div class="p-10 text-center text-gray-400 text-sm bg-white font-medium">No active Rickshaw dispatches found.</div>` : `${unassignedSection}${driverSections}`}
                         </div>
@@ -3814,9 +3814,9 @@ async function renderRickshawDispatch(container) {
 
             <div class="space-y-3">
                 <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">🚚 External Vehicle Booking Logs (Porter / Tempo / Cargo)</h3>
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <div class="min-w-[1150px]">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full">
+                    <div class="overflow-x-auto w-full">
+                        <div class="w-full min-w-[1150px]">
                             ${otherHeaderRow}
                             ${otherSections}
                         </div>
