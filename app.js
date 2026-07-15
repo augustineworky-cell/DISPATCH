@@ -24,6 +24,17 @@ const INDIAN_CITIES_REGISTRY = [
     'Visakhapatnam', 'Vijayawada', 'Kochi', 'Coimbatore', 'Madurai', 'Mysore', 'Thiruvananthapuram', 'Kozhikode',
     'Patna', 'Bhubaneswar', 'Ranchi', 'Raipur', 'Guwahati', 'Jamshedpur', 'Cuttack'
 ];
+// ==========================================
+// NEW WORKSPACE ASSET: MASTER COMPREHENSIVE INDIAN STATES REGISTRY
+// ==========================================
+const INDIAN_STATES_REGISTRY = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 
+    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 
+    'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 
+    'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir', 
+    'Ladakh', 'Chandigarh', 'Puducherry'
+];
 
 const STEP_VISUAL_PALETTE = [
     { color: '#3b82f6', icon: 'file-text' },      // STEP2_PI_CREATED
@@ -957,13 +968,11 @@ async function renderNewOrder(container) {
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">State</label>
-                            <select id="no_state" onchange="handleStateChange(this)" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <option value="" disabled selected>Select state...</option>
-                                ${['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Chandigarh','Puducherry']
-                                    .map(s => `<option value="${s}">${s}</option>`).join('')}
-                                <option value="__OTHER__">+ Other (type state)</option>
-                            </select>
-                            <input type="text" id="no_state_custom" placeholder="Enter state name..." style="display:none;" class="w-full border border-gray-300 rounded-lg p-2.5 mt-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <input type="text" id="no_state" list="indian-states-datalist" placeholder="Type state name to search..." autocomplete="off"
+                                   class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                            <datalist id="indian-states-datalist">
+                                ${INDIAN_STATES_REGISTRY.map(s => `<option value="${s}"></option>`).join('')}
+                            </datalist>
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Payment Type *</label>
@@ -1754,9 +1763,7 @@ window.handleCreateOrder = async function(e) {
         const cityInput = cityEl ? cityEl.value.trim() : null;
 
         const stateEl = document.getElementById('no_state');
-        const stateInput = stateEl.value === '__OTHER__'
-            ? document.getElementById('no_state_custom').value.trim()
-            : stateEl.value;
+        const stateInput = stateEl ? stateEl.value.trim() : null;
 
         const newOrder = await createOrderFromFields({
             companyName: companyNameInput,
