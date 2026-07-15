@@ -1002,7 +1002,7 @@ async function renderNewOrder(container) {
                                 <option value="" disabled selected>Select source...</option>
                                 <option value="Meena Bansal">Meena Bansal</option>
                                 <option value="Anshu Bansal">Anshu Bansal</option>
-                                <option value="Shubhash Bansal">Shubhash Bansal</option>
+                                <option value="Subhash Bansal">Subhash Bansal</option>
                                 <option value="IndiaMart">IndiaMart</option>
                                 <option value="Manisha">Manisha</option>
                                 <option value="__OTHER__">+ Others (type name)</option>
@@ -3908,7 +3908,7 @@ function renderWhatsAppOrderCard(p) {
                         <option value="" disabled selected>Select source...</option>
                         <option value="Meena Bansal">Meena Bansal</option>
                         <option value="Anshu Bansal">Anshu Bansal</option>
-                        <option value="Shubhash Bansal">Shubhash Bansal</option>
+                        <option value="Subhash Bansal">Subhash Bansal</option>
                         <option value="IndiaMart">IndiaMart</option>
                         <option value="Manisha">Manisha</option>
                         <option value="__OTHER__">+ Others (type name)</option>
@@ -4677,7 +4677,7 @@ window.openEditOrderModal = async function(orderId) {
 
         const cityOptions = ['Delhi','Gurgaon','Noida','Ghaziabad','Faridabad','Mumbai','Bangalore','Chennai','Kolkata','Hyderabad','Pune','Ahmedabad','Jaipur','Lucknow','Chandigarh'];
         const stateOptions = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh','Chandigarh','Puducherry'];
-        const salesOptions = ["Meena Bansal", "Anshu Bansal", "Shubhash Bansal", "IndiaMart", "Manisha"];
+        const salesOptions = ["Meena Bansal", "Anshu Bansal", "Subhash Bansal", "IndiaMart", "Manisha"];
 
         const isCityCustom = order.city && !cityOptions.includes(order.city);
         const isStateCustom = order.state && !stateOptions.includes(order.state);
