@@ -3691,18 +3691,18 @@ async function renderRickshawDispatch(container) {
         container.innerHTML = `<div class="max-w-2xl mx-auto mt-10 p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
             <p class="font-bold mb-1">Couldn't load orders</p>
             <p>${escapeHtml(err.message || 'Unknown error')}</p>
-            <p class="mt-2 text-xs text-red-500">This usually means the rickshaw_wala/rickshaw_location/rickshaw_slot migration hasn't been run in Supabase yet.</p>
         </div>`;
         return;
     }
 
-    // Group primarily by driver (the question that matters: "who is carrying
-    // this order"), then by trip/slot within that driver ("is it going with
-    // anything else, or alone"). Unassigned orders surface at the top so
-    // they don't get lost.
-    const unassigned = orders.filter(o => !o.rickshaw_wala);
+    // Filter into real-time operational streams based on user booking type
+    const rickshawOrders = (orders || []).filter(o => o.dispatch_mode === 'RICKSHAW');
+    const otherOrders = (orders || []).filter(o => o.dispatch_mode !== 'RICKSHAW');
+
+    // ─── STREAM A: PURE RICKSHAW GRAPH ───
+    const unassigned = rickshawOrders.filter(o => !o.rickshaw_wala);
     const byDriver = {};
-    orders.forEach(o => {
+    rickshawOrders.forEach(o => {
         if (!o.rickshaw_wala) return;
         (byDriver[o.rickshaw_wala] ||= []).push(o);
     });
@@ -3727,8 +3727,8 @@ async function renderRickshawDispatch(container) {
         <div class="border-b border-gray-100">
             <div class="px-3 py-2.5 bg-gray-50 flex items-center gap-2">
                 <i data-lucide="help-circle" class="w-4 h-4 text-gray-400"></i>
-                <span class="text-xs font-extrabold text-gray-500 uppercase tracking-wider">Unassigned</span>
-                <span class="text-[11px] text-gray-400 font-semibold">— ${unassigned.length} order${unassigned.length === 1 ? '' : 's'}</span>
+                <span class="text-xs font-extrabold text-gray-500 uppercase tracking-wider">Unassigned Rickshaws</span>
+                <span class="text-[11px] text-gray-400 font-semibold">— ${unassigned.length} order${unassigned.length === 1 ? '' : 's'} pending</span>
             </div>
             ${unassigned.map(o => renderRickshawOrderRow(o, null)).join('')}
         </div>` : '';
@@ -3747,25 +3747,130 @@ async function renderRickshawDispatch(container) {
         </div>`;
     }).join('');
 
-    container.innerHTML = `
-        <div class="w-full animate-in">
-            <div class="mb-6">
-                <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Rickshaw Dispatch</h2>
-                <p class="text-sm text-gray-500 mt-1">Assign a rickshaw driver, handoff location and trip slot, then click Save to store changes. Orders are grouped by driver, then by trip — orders in the same "Trip" section travelled together; separate sections mean separate trips. Click Reached once the rickshaw has handed the order off.</p>
+    // ─── STREAM B: PORTER / TEMPO EXTERNAL ENGINE ───
+    const otherHeaderRow = `
+        <div class="flex items-center gap-1 px-3 py-2.5 bg-gray-100 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+            <div class="w-20 flex-shrink-0">Order</div>
+            <div class="w-32 flex-shrink-0">Customer</div>
+            <div class="w-28 flex-shrink-0">Current Step</div>
+            <div class="w-24 flex-shrink-0">Mode</div>
+            <div class="w-40 flex-shrink-0">Driver Info / Vehicle No</div>
+            <div class="flex-1 min-w-[200px]">Upload Booking Screenshot</div>
+            <div class="w-32 flex-shrink-0 text-center sticky right-0 z-10 bg-gray-100 border-l border-gray-200 pl-2 shadow-sm">Actions</div>
+        </div>`;
+
+    const otherSections = otherOrders.length ? otherOrders.map(o => {
+        let modeColor = 'text-blue-700 bg-blue-100';
+        if (o.dispatch_mode === 'TEMPO') modeColor = 'text-amber-700 bg-amber-100';
+
+        return `
+        <div class="flex items-center gap-1 px-3 py-2.5 border-b border-gray-50 bg-white" data-order-row="${o.id}">
+            <div class="w-20 flex-shrink-0">
+                <p class="font-mono font-bold text-sm text-gray-900 truncate">${o.order_code}</p>
             </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="overflow-x-auto">
-                <div class="min-w-[1150px]">
-                ${headerRow}
-                ${orders.length === 0
-                    ? `<div class="p-10 text-center text-gray-400 text-sm">No active orders right now.</div>`
-                    : `${unassignedSection}${driverSections}`}
+            <div class="w-32 flex-shrink-0 text-sm font-semibold text-gray-800 truncate" title="${escapeHtml(o.customer_name)}">${escapeHtml(o.customer_name)}</div>
+            <div class="w-28 flex-shrink-0">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 truncate inline-block max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span>
+            </div>
+            <div class="w-24 flex-shrink-0">
+                <span class="text-[10px] font-black px-2 py-0.5 rounded uppercase ${modeColor}">${o.dispatch_mode || 'OTHER'}</span>
+            </div>
+            <div class="w-40 flex-shrink-0 pr-2">
+                <input id="ot-transport-${o.id}" type="text" value="${escapeHtml(o.transport_name || '')}"
+                    placeholder="e.g. MH-12-XX-1234"
+                    class="w-full border border-gray-300 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-indigo-500">
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <input type="file" id="ot-file-${o.id}" accept="image/*,.pdf"
+                    class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+            </div>
+            <div class="w-32 flex-shrink-0 flex items-center justify-center sticky right-0 z-10 border-l border-gray-200 pl-2 bg-white shadow-sm">
+                <button onclick="submitOtherTransportation('${o.id}')" id="ot-btn-${o.id}" class="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-all">
+                    <i data-lucide="upload" class="w-3 h-3"></i> Submit Proof
+                </button>
+            </div>
+        </div>`;
+    }).join('') : `<div class="p-8 text-center text-gray-400 text-sm font-medium bg-white">No active Porter or Tempo shipments pending verification.</div>`;
+
+    // Master workspace rendering interface injection
+    container.innerHTML = `
+        <div class="max-w-5xl mx-auto space-y-8 animate-in">
+            <div>
+                <h2 class="text-2xl font-extrabold text-gray-900 tracking-tight">Logistics & Dispatch Routing</h2>
+                <p class="text-sm text-gray-500 mt-1">Manage localized driver allocations and external freight carriers from a unified command board.</p>
+            </div>
+            
+            <div class="space-y-3">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">🛺 Local Rickshaw Delivery Schedules</h3>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <div class="min-w-[1150px]">
+                            ${headerRow}
+                            ${rickshawOrders.length === 0 ? `<div class="p-10 text-center text-gray-400 text-sm bg-white font-medium">No active Rickshaw dispatches found.</div>` : `${unassignedSection}${driverSections}`}
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <div class="space-y-3">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">🚚 External Vehicle Booking Logs (Porter / Tempo / Cargo)</h3>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <div class="min-w-[1150px]">
+                            ${otherHeaderRow}
+                            ${otherSections}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>`;
     lucide.createIcons();
 }
+
+// Global execution hook for running external transportation uploads
+window.submitOtherTransportation = async function(orderId) {
+    const transportName = document.getElementById(`ot-transport-${orderId}`)?.value.trim() || '';
+    const fileInput = document.getElementById(`ot-file-${orderId}`);
+    const btn = document.getElementById(`ot-btn-${orderId}`);
+    
+    if (!fileInput || fileInput.files.length === 0) {
+        showToast('Please attach a carrier snapshot or receipt receipt screenshot.', 'error');
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin inline"></i> Processing...`;
+    lucide.createIcons();
+
+    try {
+        const file = fileInput.files[0];
+        const uploadedUrl = await window.db.uploadFile('bmh-proofs', file);
+        
+        // Push the vehicle tracking/driver string details up to the database array mapping
+        const { error: orderErr } = await window.db.supabase
+            .from('orders')
+            .update({ transport_name: transportName || 'External Handoff Log' })
+            .eq('id', orderId);
+        if (orderErr) throw orderErr;
+
+        // Automatically pass documentation parameters straight into the active step tracker workflow
+        await window.db.submitStep(orderId, 'STEP6_TRANSPORT_CHARGES', {
+            submitted_at: new Date().toISOString(),
+            submitted_by: currentUser.id,
+            file_url: uploadedUrl,
+            notes: `Vehicle info: [${transportName || 'N/A'}]. Attached via dashboard dispatch logs.`
+        });
+
+        showToast('Transportation booking verified successfully!', 'success');
+        renderRickshawDispatch(document.getElementById('main-content'));
+    } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Error processing logistics upload', 'error');
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="upload" class="w-3 h-3"></i> Submit Proof`;
+        lucide.createIcons();
+    }
+};
 
 // Only ever called from the row's Save button — no auto-save on
 // change/blur, so a click into a field and back out doesn't silently save.
@@ -4127,6 +4232,7 @@ async function renderPaymentStatus(container) {
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Referred By</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Current Step</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Expected Mode</th>
+                        <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Amount Details</th>
                         <th class="px-3 py-2.5 uppercase tracking-wider text-[11px] font-bold whitespace-nowrap">Payment Term</th>
                     </tr>
                 </thead>
@@ -4140,6 +4246,11 @@ async function renderPaymentStatus(container) {
                         if (o.payment_type === 'CASH') badgeStyle = 'text-emerald-700 bg-emerald-100';
                         if (o.payment_type === 'BANK') badgeStyle = 'text-blue-700 bg-blue-100';
 
+                        // Dynamic billing label mapping for clean execution tracking
+                        const balanceDisplay = o.payment_term === 'ADVANCE' 
+                            ? `<span class="text-gray-900 font-mono font-bold">₹${formatINR(o.order_value)}</span><span class="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded ml-2">RECEIVED</span>`
+                            : `<span class="text-red-600 font-mono font-extrabold">₹${formatINR(o.order_value)}</span><span class="text-[9px] font-extrabold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded ml-2 animate-pulse">PENDING CALL</span>`;
+
                         return `
                         <tr class="hover:bg-indigo-50/50 cursor-pointer" onclick="openOrderDrawer('${o.id}')">
                             <td class="px-3 py-3 font-mono text-indigo-600 font-bold whitespace-nowrap">${o.order_code}</td>
@@ -4147,8 +4258,9 @@ async function renderPaymentStatus(container) {
                             <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.city) || '—'}</td>
                             <td class="px-3 py-3 text-gray-700 whitespace-nowrap">${escapeHtml(o.state) || '—'}</td>
                             <td class="px-3 py-3 text-gray-700">${escapeHtml(o.sales_person_name) || '—'}</td>
-                            <td class="px-3 py-3 max-w-[220px]"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded inline-block">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
+                            <td class="px-3 py-3 max-w-[220px]"><span class="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded inline-block truncate max-w-full">${o.current_step ? stepName(o.current_step) : '✓ Completed'}</span></td>
                             <td class="px-3 py-3 whitespace-nowrap"><span class="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase ${badgeStyle}">${typeVal}</span>${bankString}</td>
+                            <td class="px-3 py-3 whitespace-nowrap flex items-center h-full">${balanceDisplay}</td>
                             <td class="px-3 py-3 whitespace-nowrap">${paymentTermBadge(o.payment_term)}</td>
                         </tr>`;
                     }).join('')}
