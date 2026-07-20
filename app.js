@@ -3092,90 +3092,32 @@ window.closeFilePreview = function() {
 // 📈 BUSINESS INTELLIGENCE ANALYTICS PAGE
 // ==========================================
 async function renderAnalytics(container) {
-    container.innerHTML = renderLoadingState();
-    const data = await window.db.getAnalyticsData();
-
     container.innerHTML = `
-        <div class="max-w-7xl mx-auto space-y-6 animate-in pb-12">
-            <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="w-full px-4 py-4 animate-in">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight">Business Intelligence Dashboard</h1>
-                    <p class="text-sm text-gray-500 mt-1">Real-time performance analytics and pipeline optimization.</p>
+                    <h1 class="text-2xl font-extrabold text-gray-900">Business Intelligence Dashboard</h1>
+                    <p class="text-sm text-gray-500 mt-0.5">Live reporting powered by Looker Studio.</p>
                 </div>
-                <button onclick="exportAllCharts()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition">
-                    <i data-lucide="download" class="w-4 h-4"></i> Export Intelligence Sheets
-                </button>
+                <a href="https://lookerstudio.google.com/reporting/a62e038a-0677-49b2-8434-4e57937935c7/page/VoI4F"
+                   target="_blank" rel="noopener"
+                   class="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg flex items-center gap-1.5 transition">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open full report
+                </a>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 class="font-bold text-gray-900 text-sm mb-4">Historical Revenue Trend</h3>
-                    <div class="h-64 relative"><canvas id="chart-monthly-revenue"></canvas></div>
-                </div>
-
-                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 class="font-bold text-gray-900 text-sm mb-4">Logistics Distribution</h3>
-                    <div class="h-64 relative"><canvas id="chart-dispatch-mode"></canvas></div>
-                </div>
-
-                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 class="font-bold text-gray-900 text-sm mb-4">Sales Representative Pipeline Values</h3>
-                    <div class="h-64 relative"><canvas id="chart-sales-rep"></canvas></div>
-                </div>
-
-                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 class="font-bold text-gray-900 text-sm mb-4">Top Accounts by Lifetime Value</h3>
-                    <div class="h-64 relative"><canvas id="chart-top-customers"></canvas></div>
-                </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <iframe
+                    src="https://datastudio.google.com/embed/reporting/a62e038a-0677-49b2-8434-4e57937935c7/page/VoI4F"
+                    style="width:100%; height:calc(100vh - 190px); min-height:600px; border:0;"
+                    frameborder="0"
+                    allowfullscreen
+                    sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
+                </iframe>
             </div>
-        </div>
-    `;
+        </div>`;
+
     lucide.createIcons();
-
-    // ─── INITIALIZE CHART LOGICS ──────────────────────────────────
-    setTimeout(() => {
-        // 1. Line Graph: Financial Growth
-        new Chart(document.getElementById('chart-monthly-revenue'), {
-            type: 'line',
-            data: {
-                labels: Object.keys(data.monthlyRevenue),
-                datasets: [{ label: 'Revenue (₹)', data: Object.values(data.monthlyRevenue), borderColor: '#4f46e5', backgroundColor: '#4f46e510', tension: 0.3, fill: true }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        // 2. Doughnut Graph: Courier/Transport splits
-        new Chart(document.getElementById('chart-dispatch-mode'), {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(data.dispatchDistribution),
-                datasets: [{ data: Object.values(data.dispatchDistribution), backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'] }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        // 3. Bar Graph: Representative sales volumes
-        const salesNames = Object.keys(data.salesPerformance);
-        const salesValues = Object.values(data.salesPerformance).map(v => v.revenue);
-        new Chart(document.getElementById('chart-sales-rep'), {
-            type: 'bar',
-            data: {
-                labels: salesNames,
-                datasets: [{ label: 'Pipeline Closed (₹)', data: salesValues, backgroundColor: '#8b5cf6', borderRadius: 6 }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        // 4. Horizontal Bar Graph: VIP Lifetime clients
-        new Chart(document.getElementById('chart-top-customers'), {
-            type: 'bar',
-            data: {
-                labels: data.topCustomers.map(c => c.name),
-                datasets: [{ label: 'Lifetime Value (₹)', data: data.topCustomers.map(c => c.lifetime_value), backgroundColor: '#ec4899', borderRadius: 6 }]
-            },
-            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
-        });
-    }, 50);
 }
 window.handleStepPaymentTypeChange = function(selectEl) {
     const bankSelect = document.getElementById('form-bank-name');
@@ -3299,18 +3241,6 @@ window.saveDispatchMode = async function(e, orderId) {
     }
 };
 
-// Global scope export handler for chart sheets down to device memory
-window.exportAllCharts = function() {
-    showToast('Compiling analytical canvas assets...', 'info');
-    document.querySelectorAll('canvas').forEach((canvas, i) => {
-        const image = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-        const link = document.createElement('a');
-        link.download = `MMC-BI-Report-Chart-${i+1}.png`;
-        link.href = image;
-        link.click();
-    });
-    showToast('Analytics assets saved successfully!', 'success');
-};
 // --- GLOBAL AI CHALLAN PARSER ---
 window.parseChallanWithAI = async function(file) {
     const base64 = await new Promise((resolve, reject) => {
