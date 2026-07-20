@@ -3093,30 +3093,25 @@ window.closeFilePreview = function() {
 // ==========================================
 async function renderAnalytics(container) {
     container.innerHTML = `
-        <div class="w-full px-4 py-4 animate-in">
-            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="w-full h-full flex flex-col" style="margin: -24px;">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
                 <div>
-                    <h1 class="text-2xl font-extrabold text-gray-900">Business Intelligence Dashboard</h1>
-                    <p class="text-sm text-gray-500 mt-0.5">Live reporting powered by Looker Studio.</p>
+                    <h1 class="text-base font-extrabold text-gray-900">Business Intelligence Dashboard</h1>
                 </div>
                 <a href="https://lookerstudio.google.com/reporting/a62e038a-0677-49b2-8434-4e57937935c7/page/VoI4F"
                    target="_blank" rel="noopener"
-                   class="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg flex items-center gap-1.5 transition">
+                   class="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
                     <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open full report
                 </a>
             </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <iframe
-                    src="https://datastudio.google.com/embed/reporting/a62e038a-0677-49b2-8434-4e57937935c7/page/VoI4F"
-                    style="width:100%; height:calc(100vh - 190px); min-height:600px; border:0;"
-                    frameborder="0"
-                    allowfullscreen
-                    sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
-                </iframe>
-            </div>
+            <iframe
+                src="https://datastudio.google.com/embed/reporting/a62e038a-0677-49b2-8434-4e57937935c7/page/VoI4F"
+                style="width:100%; flex:1; border:0; display:block;"
+                frameborder="0"
+                allowfullscreen
+                sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
+            </iframe>
         </div>`;
-
     lucide.createIcons();
 }
 window.handleStepPaymentTypeChange = function(selectEl) {
