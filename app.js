@@ -1028,6 +1028,11 @@ async function renderNewOrder(container) {
                                 <option value="CREDIT">CREDIT</option>
                             </select>
                         </div>
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Order Value (₹)</label>
+                            <input type="number" id="no_order_value" step="0.01" min="0" placeholder="e.g. 25000"
+                                   class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-2 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Proforma Invoice (PI) (optional)</label>
@@ -1713,7 +1718,7 @@ async function createOrderFromFields(f) {
         dispatchMode: f.dispatchMode,
         salesPersonName: f.salesPersonName || null,
         paymentTerm: f.paymentTerm || null,
-        orderValue: null   // BMH's process doesn't track this — schema column stays nullable
+        orderValue: f.orderValue ?? null
     });
 }
 
@@ -1750,7 +1755,8 @@ window.handleCreateOrder = async function(e) {
             salesPersonName: salesEl.value === '__OTHER__'
                 ? document.getElementById('no_sales_custom').value.trim()
                 : salesEl.value,
-            paymentTerm: document.getElementById('no_payment_term').value
+            paymentTerm: document.getElementById('no_payment_term').value,
+            orderValue: document.getElementById('no_order_value').value ? parseFloat(document.getElementById('no_order_value').value) : null
         });
 
         const piFile = document.getElementById('no_pi_file').files[0];
@@ -4794,9 +4800,17 @@ window.openEditOrderModal = async function(orderId) {
 
                         <div class="grid grid-cols-2 gap-4">
                             <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Order Value (₹)</label>
+                                <input type="number" id="eo_order_value" step="0.01" min="0" value="${order.order_value ?? ''}"
+                                       class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Customer Phone 1</label>
                                 <input type="tel" id="eo_phone" value="${escapeHtml(order.customer_phone || '')}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                             </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Customer Phone 2</label>
                                 <input type="tel" id="eo_phone_2" value="${escapeHtml(order.customer_phone_2 || '')}" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
@@ -4959,7 +4973,8 @@ window.submitEditOrderForm = async function(e, orderId) {
             payment_type: paymentType,
             bank_name: bankName,
             dispatch_mode: document.getElementById('eo_dispatch_mode').value,
-            sales_person_name: salesValue
+            sales_person_name: salesValue,
+            order_value: document.getElementById('eo_order_value').value ? parseFloat(document.getElementById('eo_order_value').value) : null
         };
 
         // Check if an order document/file is being uploaded dynamically
