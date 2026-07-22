@@ -55,8 +55,32 @@ window.db = {
     // ========================================================================
 
     async getCustomers() {
-        const { data } = await supabaseClient.from('customers').select('*').order('name');
-        return data || [];
+        const { data: customers } = await supabaseClient
+            .from('customers').select('*').order('company_name');
+        if (!customers) return [];
+
+        // The BMH customers table has no stored lifetime_value / total_orders /
+        // last_order_at columns, so derive them per-customer from orders.
+        const { data: orders } = await supabaseClient
+            .from('orders')
+            .select('customer_id, order_value, created_at')
+            .eq('is_deleted', false);
+
+        const stats = {};
+        (orders || []).forEach(o => {
+            if (!o.customer_id) return;
+            const s = stats[o.customer_id] || (stats[o.customer_id] = { total_orders: 0, lifetime_value: 0, last_order_at: null });
+            s.total_orders += 1;
+            s.lifetime_value += Number(o.order_value || 0);
+            if (!s.last_order_at || o.created_at > s.last_order_at) s.last_order_at = o.created_at;
+        });
+
+        return customers.map(c => ({
+            ...c,
+            total_orders: stats[c.id]?.total_orders || 0,
+            lifetime_value: stats[c.id]?.lifetime_value || 0,
+            last_order_at: stats[c.id]?.last_order_at || null,
+        }));
     },
 
     async getAllCustomers() {
@@ -86,23 +110,25 @@ window.db = {
         return { customer, orders: orders || [] };
     },
 
+    // orgId is accepted for call-site compatibility but unused: the BMH
+    // customers table has no organization_id column (single-org install).
     async upsertCustomer(orgId, name, phone) {
         if (phone && phone.trim()) {
             const { data: byPhone } = await supabaseClient
                 .from('customers').select('id')
-                .eq('organization_id', orgId).eq('phone', phone.trim())
+                .eq('phone_1', phone.trim())
                 .limit(1).maybeSingle();
             if (byPhone) return byPhone.id;
         }
         const { data: byName } = await supabaseClient
             .from('customers').select('id')
-            .eq('organization_id', orgId).ilike('name', name)
+            .ilike('company_name', name)
             .limit(1).maybeSingle();
         if (byName) return byName.id;
 
         const { data, error } = await supabaseClient
             .from('customers')
-            .insert([{ organization_id: orgId, name, phone: phone?.trim() || null }])
+            .insert([{ company_name: name, phone_1: phone?.trim() || null }])
             .select('id').single();
         if (error) throw error;
         return data.id;
@@ -163,9 +189,11 @@ window.db = {
             .select('order_value, created_at, dispatch_mode, sales_person_name, customer_id, is_completed, completed_date')
             .eq('is_deleted', false);
 
-        const { data: topCust } = await supabaseClient
-            .from('customers').select('name, lifetime_value, total_orders')
-            .order('lifetime_value', { ascending: false }).limit(10);
+        // customers has no stored lifetime_value/total_orders; map ids to names
+        // and derive the top-customer ranking from the orders above.
+        const { data: custRows } = await supabaseClient
+            .from('customers').select('id, company_name');
+        const custNames = {}; (custRows || []).forEach(c => { custNames[c.id] = c.company_name; });
 
         const monthlyRevenue = {};
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -195,9 +223,17 @@ window.db = {
             salesPerformance[sp].count += 1;
         });
 
-        const topCustomers = (topCust || []).map(c => ({
-            name: c.name, lifetime_value: c.lifetime_value || 0, total_orders: c.total_orders || 0
-        }));
+        const custAgg = {};
+        (orders || []).forEach(o => {
+            if (!o.customer_id) return;
+            const a = custAgg[o.customer_id] || (custAgg[o.customer_id] = { lifetime_value: 0, total_orders: 0 });
+            a.lifetime_value += Number(o.order_value || 0);
+            a.total_orders += 1;
+        });
+        const topCustomers = Object.entries(custAgg)
+            .map(([id, a]) => ({ name: custNames[id] || 'Unknown', lifetime_value: a.lifetime_value, total_orders: a.total_orders }))
+            .sort((x, y) => y.lifetime_value - x.lifetime_value)
+            .slice(0, 10);
 
         return { monthlyRevenue, dispatchDistribution, salesPerformance, topCustomers };
     },
@@ -264,7 +300,7 @@ window.db = {
         const [{ data: orders, error: errOrders }, { data: customers, error: errCust }] = await Promise.all([
             supabaseClient.from('orders').select('*')
                 .or(`order_code.ilike.${q},customer_name.ilike.${q},customer_phone.ilike.${q}`).limit(8),
-            supabaseClient.from('customers').select('*').or(`name.ilike.${q},phone.ilike.${q}`).limit(5)
+            supabaseClient.from('customers').select('*').or(`company_name.ilike.${q},phone_1.ilike.${q}`).limit(5)
         ]);
         if (errOrders) console.error('Order Search Error:', errOrders.message);
         if (errCust) console.error('Customer Search Error:', errCust.message);

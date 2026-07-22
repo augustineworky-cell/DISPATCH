@@ -458,8 +458,8 @@ function renderSearchResults(results, query) {
                         <i data-lucide="user" class="w-4 h-4 text-violet-600"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="font-bold text-sm text-gray-900 truncate">${highlightMatch(c.name, query)}</div>
-                        <div class="text-[11px] text-gray-500 mt-0.5">${c.phone || '—'} · ${c.total_orders || 0} orders</div>
+                        <div class="font-bold text-sm text-gray-900 truncate">${highlightMatch(c.company_name, query)}</div>
+                        <div class="text-[11px] text-gray-500 mt-0.5">${c.phone_1 || '—'}</div>
                     </div>
                 </div>`;
         });
@@ -1793,7 +1793,7 @@ window.addQuickCustomer = async function(e) {
     const name = prompt('Customer name:');
     if (!name?.trim()) return;
     try {
-        await window.db.supabase.from('customers').insert([{ organization_id: currentOrgId, name: name.trim() }]);
+        await window.db.supabase.from('customers').insert([{ company_name: name.trim() }]);
         showToast('Customer added!', 'success');
         setTimeout(() => router(), 600);
     } catch (err) { showToast(err.message, 'error'); }
@@ -2125,10 +2125,10 @@ window.handleMobileSearchInput = function(query) {
                 html += `<p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mt-4 mb-2 px-1">Customers</p>`;
                 html += customers.map(c => `
                     <div onclick="closeMobileSearch(); openCustomerDrawer('${c.id}')" class="bg-white rounded-2xl shadow-sm p-3.5 flex items-center gap-3 mb-2">
-                        <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center font-extrabold text-purple-600 text-sm">${(c.name || '?').substring(0,2).toUpperCase()}</div>
+                        <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center font-extrabold text-purple-600 text-sm">${(c.company_name || '?').substring(0,2).toUpperCase()}</div>
                         <div class="flex-1 min-w-0">
-                            <p class="font-bold text-gray-900 text-sm truncate">${escapeHtml(c.name)}</p>
-                            <p class="text-xs text-gray-400">${c.phone || ''}</p>
+                            <p class="font-bold text-gray-900 text-sm truncate">${escapeHtml(c.company_name)}</p>
+                            <p class="text-xs text-gray-400">${c.phone_1 || ''}</p>
                         </div>
                     </div>`).join('');
             }
@@ -2428,9 +2428,6 @@ async function renderCustomers(container) {
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
                     <input type="text" id="cust-search" oninput="filterCustomersList()" placeholder="Search by name, phone, city..." class="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none">
                 </div>
-                <button onclick="filterCustomersVIP()" id="vip-filter" class="text-xs font-bold border border-gray-200 hover:border-amber-400 px-3 py-2 rounded-lg flex items-center gap-1.5 transition">
-                    <i data-lucide="star" class="w-3.5 h-3.5"></i> VIP Only
-                </button>
                 <select id="cust-sort" onchange="filterCustomersList()" class="text-xs font-semibold border border-gray-200 rounded-lg px-3 py-2 bg-white outline-none">
                     <option value="name">Sort: Name (A-Z)</option>
                     <option value="ltv">Sort: Lifetime Value</option>
@@ -2452,9 +2449,9 @@ async function renderCustomers(container) {
 }
 
 function renderCustomerCard(c) {
-    const initials = (c.name || 'U').substring(0,2).toUpperCase();
+    const initials = (c.company_name || 'U').substring(0,2).toUpperCase();
     const colors = ['#4f46e5','#8b5cf6','#ec4899','#f97316','#10b981','#0284c7','#dc2626'];
-    const color = colors[(c.name?.charCodeAt(0) || 0) % colors.length];
+    const color = colors[(c.company_name?.charCodeAt(0) || 0) % colors.length];
 
     return `
         <div data-customer-id="${c.id}" onclick="openCustomerDrawer('${c.id}')" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition cursor-pointer">
@@ -2464,10 +2461,9 @@ function renderCustomerCard(c) {
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                        <h3 class="font-extrabold text-gray-900 truncate">${escapeHtml(c.name)}</h3>
-                        ${c.is_vip ? '<span class="text-xs">⭐</span>' : ''}
+                        <h3 class="font-extrabold text-gray-900 truncate">${escapeHtml(c.company_name)}</h3>
                     </div>
-                    <p class="text-xs text-gray-500 truncate">${c.phone || c.email || 'No contact'}</p>
+                    <p class="text-xs text-gray-500 truncate">${c.phone_1 || c.email || 'No contact'}</p>
                     ${c.city ? `<p class="text-[10px] text-gray-400 mt-0.5">📍 ${c.city}${c.state ? ', ' + c.state : ''}</p>` : ''}
                 </div>
             </div>
@@ -2487,41 +2483,24 @@ function renderCustomerCard(c) {
 window.filterCustomersList = function() {
     const q = document.getElementById('cust-search').value.toLowerCase().trim();
     const sort = document.getElementById('cust-sort').value;
-    const vipOnly = document.getElementById('vip-filter').classList.contains('active-filter');
 
     let filtered = (window.__allCustomers || []).filter(c => {
-        if (vipOnly && !c.is_vip) return false;
         if (!q) return true;
-        return (c.name || '').toLowerCase().includes(q)
-            || (c.phone || '').includes(q)
+        return (c.company_name || '').toLowerCase().includes(q)
+            || (c.phone_1 || '').includes(q)
             || (c.city || '').toLowerCase().includes(q);
     });
 
     if (sort === 'ltv')      filtered.sort((a,b) => (b.lifetime_value||0) - (a.lifetime_value||0));
     else if (sort === 'orders') filtered.sort((a,b) => (b.total_orders||0) - (a.total_orders||0));
     else if (sort === 'recent') filtered.sort((a,b) => new Date(b.last_order_at||0) - new Date(a.last_order_at||0));
-    else filtered.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    else filtered.sort((a,b) => (a.company_name||'').localeCompare(b.company_name||''));
 
     const grid = document.getElementById('customers-grid');
     grid.innerHTML = filtered.length === 0
         ? `<div class="col-span-3 text-center text-gray-400 py-8">No customers match your filters</div>`
         : filtered.map(c => renderCustomerCard(c)).join('');
     lucide.createIcons();
-};
-
-window.filterCustomersVIP = function() {
-    const btn = document.getElementById('vip-filter');
-    btn.classList.toggle('active-filter');
-    if (btn.classList.contains('active-filter')) {
-        btn.style.background = '#fef3c7';
-        btn.style.borderColor = '#f59e0b';
-        btn.style.color = '#92400e';
-    } else {
-        btn.style.background = '';
-        btn.style.borderColor = '';
-        btn.style.color = '';
-    }
-    filterCustomersList();
 };
 
 // ==========================================
@@ -2567,9 +2546,9 @@ window.closeCustomerDrawer = function() {
 };
 
 function renderCustomerDrawer(customer, orders) {
-    const initials = (customer.name || 'U').substring(0,2).toUpperCase();
+    const initials = (customer.company_name || 'U').substring(0,2).toUpperCase();
     const colors = ['#4f46e5','#8b5cf6','#ec4899','#f97316','#10b981','#0284c7'];
-    const color = colors[(customer.name?.charCodeAt(0) || 0) % colors.length];
+    const color = colors[(customer.company_name?.charCodeAt(0) || 0) % colors.length];
 
     const activeOrders = orders.filter(o => !o.is_completed).length;
     const completedOrders = orders.filter(o => o.is_completed).length;
@@ -2600,10 +2579,9 @@ function renderCustomerDrawer(customer, orders) {
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h2 class="text-xl font-extrabold text-gray-900">${escapeHtml(customer.name)}</h2>
-                        ${customer.is_vip ? '<span title="VIP" class="text-amber-500">⭐</span>' : ''}
+                        <h2 class="text-xl font-extrabold text-gray-900">${escapeHtml(customer.company_name)}</h2>
                     </div>
-                    <p class="text-xs text-gray-500 mt-0.5">${customer.phone || customer.email || 'No contact'}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">${customer.phone_1 || customer.email || 'No contact'}</p>
                 </div>
             </div>
             <button onclick="closeCustomerDrawer()" class="text-gray-400 hover:text-gray-900 p-1.5 hover:bg-gray-100 rounded-full">
@@ -2612,32 +2590,28 @@ function renderCustomerDrawer(customer, orders) {
         </div>
 
         <div class="drawer-body p-5 space-y-4">
-            <div class="grid grid-cols-3 gap-2">
-                ${customer.phone ? `
-                <a href="tel:${customer.phone}" class="flex flex-col items-center gap-1 p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+            ${customer.phone_1 ? `
+            <div class="grid grid-cols-2 gap-2">
+                <a href="tel:${customer.phone_1}" class="flex flex-col items-center gap-1 p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
                     <i data-lucide="phone" class="w-4 h-4 text-blue-600"></i>
                     <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Call</span>
                 </a>
-                <a href="https://wa.me/${customer.phone.replace(/[^0-9]/g,'').replace(/^91?/, '91')}" target="_blank" class="flex flex-col items-center gap-1 p-3 bg-green-50 hover:bg-green-100 rounded-xl transition">
+                <a href="https://wa.me/${customer.phone_1.replace(/[^0-9]/g,'').replace(/^91?/, '91')}" target="_blank" class="flex flex-col items-center gap-1 p-3 bg-green-50 hover:bg-green-100 rounded-xl transition">
                     <i data-lucide="message-circle" class="w-4 h-4 text-green-600"></i>
                     <span class="text-[10px] font-bold text-green-700 uppercase tracking-wider">WhatsApp</span>
                 </a>
-                ` : `<div class="col-span-2"></div>`}
-                <button onclick="toggleVIP('${customer.id}', ${!customer.is_vip})" class="flex flex-col items-center gap-1 p-3 ${customer.is_vip ? 'bg-amber-50 hover:bg-amber-100' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl transition">
-                    <i data-lucide="star" class="w-4 h-4 ${customer.is_vip ? 'text-amber-600' : 'text-gray-400'}"></i>
-                    <span class="text-[10px] font-bold ${customer.is_vip ? 'text-amber-700' : 'text-gray-600'} uppercase tracking-wider">${customer.is_vip ? 'VIP ✓' : 'Mark VIP'}</span>
-                </button>
             </div>
+            ` : ''}
 
             <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Total Orders</div>
-                        <div class="text-2xl font-extrabold text-gray-900 mt-0.5">${customer.total_orders || 0}</div>
+                        <div class="text-2xl font-extrabold text-gray-900 mt-0.5">${orders.length}</div>
                     </div>
                     <div>
                         <div class="text-[10px] font-bold text-indigo-600/70 uppercase tracking-wider">Lifetime Value</div>
-                        <div class="text-2xl font-extrabold text-gray-900 mt-0.5 font-mono">₹${formatINR(customer.lifetime_value)}</div>
+                        <div class="text-2xl font-extrabold text-gray-900 mt-0.5 font-mono">₹${formatINR(orders.reduce((sum, o) => sum + Number(o.order_value || 0), 0))}</div>
                     </div>
                 </div>
                 <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-indigo-100">
@@ -2674,14 +2648,6 @@ function renderCustomerDrawer(customer, orders) {
     lucide.createIcons();
 }
 
-window.toggleVIP = async function(customerId, makeVIP) {
-    try {
-        await window.db.supabase.from('customers').update({ is_vip: makeVIP }).eq('id', customerId);
-        showToast(makeVIP ? '⭐ Marked as VIP' : 'VIP status removed', 'success');
-        openCustomerDrawer(customerId);
-    } catch (err) { showToast(err.message, 'error'); }
-};
-
 window.openAddCustomerModal = function() {
     const html = `
         <div id="add-cust-modal" class="fixed inset-0 z-[70] flex items-center justify-center modal-backdrop p-4">
@@ -2697,21 +2663,11 @@ window.openAddCustomerModal = function() {
                         <label class="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
                         <input type="text" id="nc-name" required class="w-full border rounded-lg p-2.5 text-sm">
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
-                            <input type="tel" id="nc-phone" placeholder="9876543210" class="w-full border rounded-lg p-2.5 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
-                            <input type="email" id="nc-email" class="w-full border rounded-lg p-2.5 text-sm">
-                        </div>
-                    </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">Address</label>
-                        <textarea id="nc-address" rows="2" class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
+                        <input type="tel" id="nc-phone" placeholder="9876543210" class="w-full border rounded-lg p-2.5 text-sm">
                     </div>
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">City</label>
                             <input type="text" id="nc-city" class="w-full border rounded-lg p-2.5 text-sm">
@@ -2720,19 +2676,11 @@ window.openAddCustomerModal = function() {
                             <label class="block text-sm font-semibold text-gray-700 mb-1">State</label>
                             <input type="text" id="nc-state" class="w-full border rounded-lg p-2.5 text-sm">
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">Pincode</label>
-                            <input type="text" id="nc-pincode" class="w-full border rounded-lg p-2.5 text-sm">
-                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">GSTIN</label>
                         <input type="text" id="nc-gstin" placeholder="22AAAAA0000A1Z5" class="w-full border rounded-lg p-2.5 text-sm font-mono uppercase">
                     </div>
-                    <label class="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer">
-                        <input type="checkbox" id="nc-vip" class="w-4 h-4">
-                        <span class="text-sm font-semibold">⭐ Mark as VIP customer</span>
-                    </label>
                     <div class="flex justify-end gap-2 pt-3">
                         <button type="button" onclick="document.getElementById('add-cust-modal').remove()" class="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
                         <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow flex items-center gap-1.5">
@@ -2750,16 +2698,11 @@ window.submitNewCustomer = async function(e) {
     e.preventDefault();
     try {
         const data = {
-            organization_id: currentOrgId,
-            name: document.getElementById('nc-name').value.trim(),
-            phone: document.getElementById('nc-phone').value.trim() || null,
-            email: document.getElementById('nc-email').value.trim() || null,
-            address: document.getElementById('nc-address').value.trim() || null,
+            company_name: document.getElementById('nc-name').value.trim(),
+            phone_1: document.getElementById('nc-phone').value.trim() || null,
             city: document.getElementById('nc-city').value.trim() || null,
             state: document.getElementById('nc-state').value.trim() || null,
-            pincode: document.getElementById('nc-pincode').value.trim() || null,
-            gstin: document.getElementById('nc-gstin').value.trim().toUpperCase() || null,
-            is_vip: document.getElementById('nc-vip').checked
+            gstin: document.getElementById('nc-gstin').value.trim().toUpperCase() || null
         };
         await window.db.supabase.from('customers').insert([data]);
         document.getElementById('add-cust-modal').remove();
